@@ -2,24 +2,36 @@ import Foundation
 
 public struct ScanOptions: Sendable {
 
-    /// Stay on one filesystem.
+    /// Visit other volumes mounted inside the tree.
     ///
-    /// On macOS the data volume is firmlinked into `/`, so crossing mount points
-    /// counts the same bytes twice and wanders into external and network volumes.
+    /// Off by default so a scan does not wander into external and network
+    /// volumes. Note this alone does not prevent double counting on macOS:
+    /// firmlinks share a device id with the root, and are excluded by
+    /// `deduplicateDirectories` instead.
     public var crossMountPoints: Bool
 
     /// Count each inode once, so hard-linked files are not summed repeatedly.
     public var deduplicateHardLinks: Bool
+
+    /// Visit each directory inode once.
+    ///
+    /// macOS firmlinks `/System/Volumes/Data` onto `/`, so the same directories
+    /// are reachable by two paths that share a device id — walking both reports
+    /// a disk as twice as full as it is. The firmlinked path and its twin are
+    /// the same inode, so counting inodes catches it where device ids cannot.
+    public var deduplicateDirectories: Bool
 
     public var concurrency: Int
 
     public init(
         crossMountPoints: Bool = false,
         deduplicateHardLinks: Bool = true,
+        deduplicateDirectories: Bool = true,
         concurrency: Int = ProcessInfo.processInfo.activeProcessorCount * 2
     ) {
         self.crossMountPoints = crossMountPoints
         self.deduplicateHardLinks = deduplicateHardLinks
+        self.deduplicateDirectories = deduplicateDirectories
         self.concurrency = concurrency
     }
 }
@@ -48,6 +60,7 @@ public final class DiskScanner: @unchecked Sendable {
     private final class State: @unchecked Sendable {
         let lock = NSLock()
         var seenInodes: Set<UInt64> = []
+        var seenDirectories: Set<UInt64> = []
         var directories = 0
         var files = 0
         var bytes: Int64 = 0
@@ -59,6 +72,13 @@ public final class DiskScanner: @unchecked Sendable {
             lock.lock()
             defer { lock.unlock() }
             return seenInodes.insert(inode).inserted
+        }
+
+        /// Returns false when this directory has already been walked by another path.
+        func claimDirectory(inode: UInt64) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return seenDirectories.insert(inode).inserted
         }
     }
 
@@ -121,6 +141,10 @@ public final class DiskScanner: @unchecked Sendable {
                 child.parent = directory
                 if let deviceID, self.deviceID(of: child.path) != deviceID {
                     continue  // A different volume mounted inside this tree.
+                }
+                // Skip a directory reachable by two paths, such as a firmlink.
+                if options.deduplicateDirectories, !state.claimDirectory(inode: entry.fileID) {
+                    continue
                 }
                 children.append(child)
                 subdirectories.append(child)

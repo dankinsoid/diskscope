@@ -24,9 +24,14 @@ struct SourceOptions: ParsableArguments {
         }
 
         let scanner = DiskScanner(options: ScanOptions(crossMountPoints: crossMounts))
+        let progress = quiet ? nil : ProgressReporter(scanner: scanner)
+        progress?.start()
+
         let started = Date()
         let root = scanner.scan(path: path)
         let duration = Date().timeIntervalSince(started)
+
+        progress?.stop()
         if !quiet {
             Output.note("scanned \(root.fileCount) files in \(String(format: "%.1fs", duration))")
         }

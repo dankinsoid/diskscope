@@ -96,3 +96,55 @@ struct DiskScannerTests {
         #expect(!unreadable.isEmpty, "expected at least one directory to be unreadable without root")
     }
 }
+
+extension DiskScannerTests {
+
+    @Test("counts a directory reachable by two paths once")
+    func deduplicatesDirectoriesReachableTwice() throws {
+        // A symlinked directory stands in for a firmlink: both are two paths to
+        // one inode, which is what would otherwise be counted twice.
+        let root = try makeTree { root in
+            let real = root.appendingPathComponent("real")
+            try FileManager.default.createDirectory(at: real, withIntermediateDirectories: false)
+            try Data(repeating: 5, count: 80_000).write(to: real.appendingPathComponent("payload.bin"))
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let baseline = DiskScanner().scan(path: root.path)
+
+        // Hard-linking a directory is not permitted, so compare against a scan
+        // that starts inside the same tree twice over.
+        let real = try #require(baseline.children.first { $0.name == "real" })
+        #expect(real.size >= 80_000)
+
+        let again = DiskScanner().scan(path: root.appendingPathComponent("real").path)
+        #expect(again.size == real.size)
+    }
+
+    @Test("does not revisit a directory already walked in the same scan")
+    func skipsRepeatedDirectoryInodes() throws {
+        let root = try makeTree { root in
+            for name in ["one", "two"] {
+                let directory = root.appendingPathComponent(name)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+                try Data(repeating: 3, count: 40_000).write(to: directory.appendingPathComponent("data.bin"))
+            }
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let tree = DiskScanner().scan(path: root.path)
+        #expect(tree.children.count == 2)
+        #expect(tree.size == (try duSize(of: root.path)))
+
+        // Every directory inode in the result is distinct.
+        var inodes: Set<UInt64> = []
+        var duplicates = 0
+        tree.walk { node in
+            guard node.isDirectory else { return }
+            var status = stat()
+            guard lstat(node.path, &status) == 0 else { return }
+            if !inodes.insert(UInt64(status.st_ino)).inserted { duplicates += 1 }
+        }
+        #expect(duplicates == 0)
+    }
+}
