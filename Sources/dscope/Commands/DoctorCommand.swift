@@ -46,10 +46,8 @@ struct DoctorCommand: ParsableCommand {
         terminal.deactivate()
 
         if seen.isEmpty {
-            print("\nNo keys arrived. This terminal is not delivering input to the program.")
-            print("Warp, and some editor-embedded terminals, intercept keys before the")
-            print("program sees them. Try Terminal.app, iTerm2 or Ghostty, or use the")
-            print("one-shot commands: dscope scan / search / top.")
+            print("\nNo keys arrived — this terminal is not delivering input to the program.")
+            print("The one-shot commands work regardless: dscope scan / search / top.")
         } else {
             print("\nInput works — \(seen.count) keys arrived. The browser should run here.")
         }

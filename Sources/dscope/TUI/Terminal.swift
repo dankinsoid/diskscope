@@ -24,18 +24,6 @@ final class Terminal {
         isatty(STDIN_FILENO) == 1 && isatty(STDOUT_FILENO) == 1
     }
 
-    /// Terminals that run commands as blocks rather than as a live session, and
-    /// do not reliably hand keystrokes to a full-screen program.
-    ///
-    /// Reported rather than refused: the list cannot be complete, and a version
-    /// that works should not be blocked by its name.
-    static var mayNotDeliverInput: String? {
-        switch ProcessInfo.processInfo.environment["TERM_PROGRAM"] {
-        case "WarpTerminal": "Warp"
-        default: nil
-        }
-    }
-
     func activate() {
         guard !isActive else { return }
         tcgetattr(STDIN_FILENO, &original)
