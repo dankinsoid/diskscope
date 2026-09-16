@@ -95,7 +95,7 @@ enum BrowserView {
         if state.isSearching {
             label = node.path
         } else {
-            label = node.name + (node.isDirectory ? "/" : "")
+            label = node.isDirectory && !node.name.hasSuffix("/") ? node.name + "/" : node.name
         }
 
         // An arrow as well as the inverted row: reverse video is easy to lose

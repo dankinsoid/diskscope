@@ -46,7 +46,11 @@ enum TreeRenderer {
             let branch = isLast ? "└── " : "├── "
             let marker = selection?.covers(child) == true ? "[x] " : ""
             let suffix = child.error != nil ? "  (unreadable)" : ""
-            let name = child.isDirectory ? child.name + "/" : child.name
+            // A volume is already named with its mount point, so appending the
+            // usual directory slash would print "//".
+            let name = child.isDirectory && !child.name.hasSuffix("/")
+                ? child.name + "/"
+                : child.name
 
             lines.append("\(child.size.formattedBytes())\t\(prefix)\(branch)\(marker)\(name)\(suffix)")
 

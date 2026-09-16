@@ -82,6 +82,13 @@ struct VolumesReport: Codable {
     struct VolumeJSON: Codable {
         let mountPoint: String
         let device: String
+
+        /// Volumes sharing this report the same usedBytes; never sum them.
+        let storagePool: String
+
+        /// Set when this is a mounted image, whose bytes are the file named
+        /// here and are already counted by a scan covering it.
+        let diskImageOf: String?
         let filesystem: String
         let readOnly: Bool
         let capacityBytes: Int64
@@ -100,6 +107,8 @@ struct VolumesReport: Codable {
             VolumeJSON(
                 mountPoint: $0.mountPoint,
                 device: $0.device,
+                storagePool: $0.storagePool,
+                diskImageOf: $0.diskImageBackingPath,
                 filesystem: $0.filesystem,
                 readOnly: $0.isReadOnly,
                 capacityBytes: $0.capacity,

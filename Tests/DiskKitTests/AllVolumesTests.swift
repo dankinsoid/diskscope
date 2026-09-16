@@ -70,3 +70,22 @@ struct AllVolumesTests {
         #expect(child.path == "/work/src")
     }
 }
+
+extension AllVolumesTests {
+
+    @Test("pseudo filesystems and bookkeeping volumes are left out")
+    func skipsPseudoFilesystems() {
+        let scannable = AllVolumes.scannable()
+
+        // /dev is a kernel interface, and the firmware volumes hold nothing a
+        // person put there; walking them costs time and reports nothing.
+        #expect(!scannable.contains { $0.mountPoint == "/dev" })
+        #expect(!scannable.contains { $0.filesystem == "devfs" })
+        #expect(!scannable.contains { $0.mountPoint.hasPrefix("/System/Volumes/xarts") })
+    }
+
+    @Test("every scannable volume is large enough to be worth walking")
+    func skipsTinyVolumes() {
+        #expect(AllVolumes.scannable().allSatisfy { $0.used >= 64 * 1_048_576 })
+    }
+}

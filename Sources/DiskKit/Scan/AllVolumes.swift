@@ -16,7 +16,11 @@ public enum AllVolumes {
 
         for volume in VolumeInfo.mounted() {
             guard !volume.isDiskImage else { continue }
-            guard volume.used > 0 else { continue }
+            guard !isPseudoFilesystem(volume) else { continue }
+
+            // Below this a volume is bookkeeping rather than storage, and
+            // scanning it costs more than it can ever report.
+            guard volume.used >= 64 * 1_048_576 else { continue }
 
             // Prefer the shallowest mount point of a pool: on macOS the data
             // volume is reachable from "/", so scanning both counts it twice.
@@ -26,6 +30,20 @@ public enum AllVolumes {
             }
         }
         return byPool.values.sorted { $0.mountPoint < $1.mountPoint }
+    }
+
+    /// Whether a volume holds kernel state rather than files worth measuring.
+    private static func isPseudoFilesystem(_ volume: VolumeInfo) -> Bool {
+        switch volume.filesystem {
+        case "devfs", "autofs", "nullfs", "procfs", "fdesc", "lifs", "msdos":
+            true
+        default:
+            // The secure-token and firmware volumes exist for the system's own
+            // use and hold nothing a person put there.
+            volume.mountPoint.hasPrefix("/System/Volumes/xarts")
+                || volume.mountPoint.hasPrefix("/System/Volumes/iSCPreboot")
+                || volume.mountPoint.hasPrefix("/System/Volumes/Hardware")
+        }
     }
 
     /// Scans every volume and gathers the results under one root.
