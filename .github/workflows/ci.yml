@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+
+      - name: Build
+        run: swift build -c release
+
+      - name: Test
+        run: swift test
+
+      - name: Check the CLI runs
+        run: |
+          BINARY=$(swift build -c release --show-bin-path)/dscope
+          "$BINARY" --version
+          "$BINARY" scan . --depth 1 --json > /tmp/scan.json
+          python3 -c "import json;d=json.load(open('/tmp/scan.json'));assert d['totalBytes']>0,d"
