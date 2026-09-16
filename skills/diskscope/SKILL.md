@@ -95,8 +95,14 @@ held by things no tree contains. Run `dscope volumes --json` to see them:
 - **APFS local snapshots**, listed as `localSnapshots`. Remove with
   `tmutil deletelocalsnapshots <name>` — tell the user the command rather than
   running it.
-- **unreadable directories**, when Full Disk Access is not granted to the
-  terminal.
+- **unreadable directories**. Check with `dscope access --json`: when
+  `fullDiskAccess` is false, give the user the `instructions` field rather than
+  trying to grant it yourself. Some directories stay unreadable even with it
+  granted, because System Integrity Protection forbids reading them at all —
+  `sudo` does not help either.
+- **other mounted volumes**, which a scan does not cross into. A scan reports
+  them in its stderr notes; `--cross-mounts` includes them, but then firmlinked
+  system paths are counted twice, so prefer scanning such a volume directly.
 
 Scanning `/` needs Full Disk Access to be complete, and takes a few minutes.
 

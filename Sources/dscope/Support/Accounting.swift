@@ -12,8 +12,14 @@ enum Accounting {
         var lines: [String] = []
 
         if !snapshot.unreadablePaths.isEmpty {
-            lines.append("\(snapshot.unreadablePaths.count) directories could not be read; sizes are lower bounds")
+            var line = "\(snapshot.unreadablePaths.count) directories could not be read; sizes are lower bounds"
+            if !FullDiskAccess.isGranted() {
+                line += " — grant Full Disk Access to read them (dscope volumes explains how)"
+            }
+            lines.append(line)
         }
+
+        lines.append(contentsOf: skippedVolumeLines(for: snapshot))
 
         guard let accounting = snapshot.accounting, accounting.isSignificant else { return lines }
 
@@ -36,5 +42,38 @@ enum Accounting {
             )
         }
         return lines
+    }
+
+    /// Volumes mounted inside the scanned tree that the walk deliberately skipped.
+    ///
+    /// Not crossing mount points is what keeps a scan off external disks and
+    /// stops firmlinks being counted twice, but silently omitting a 2TB drive
+    /// mounted under /Volumes would be its own kind of wrong answer.
+    private static func skippedVolumeLines(for snapshot: Snapshot) -> [String] {
+        guard !snapshot.options.crossMountPoints else { return [] }
+
+        let root = (snapshot.rootPath as NSString).standardizingPath
+        let scannedPool = snapshot.volume?.storagePool
+
+        let skipped = VolumeInfo.mounted().filter { volume in
+            guard volume.mountPoint != root else { return false }
+            guard root == "/" || volume.mountPoint.hasPrefix(root + "/") else { return false }
+            guard volume.storagePool != scannedPool else { return false }
+            // Read-only system images (simulator runtimes, cryptexes, mounted
+            // disk images) are reported too: they occupy space the user may not
+            // realise is mounted.
+            return volume.used >= 104_857_600
+        }
+        guard !skipped.isEmpty else { return [] }
+
+        let total = skipped.reduce(Int64(0)) { $0 + $1.used }
+        let names = skipped.sorted { $0.used > $1.used }.prefix(3).map(\.mountPoint)
+        let suffix = skipped.count > names.count ? " and \(skipped.count - names.count) more" : ""
+
+        return [
+            "\(skipped.count) other volumes were not scanned, holding \(total.formattedBytes()):"
+                + " \(names.joined(separator: ", "))\(suffix)",
+            "scan one directly, or pass --cross-mounts to include them",
+        ]
     }
 }
