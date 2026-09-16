@@ -40,7 +40,10 @@ struct BrowseCommand: ParsableCommand {
 
     func run() throws {
         var source = source
-        if source.path == SourceOptions.wholeDisk, !CommandLine.arguments.contains(SourceOptions.wholeDisk) {
+        // A bare invocation starts at home rather than the whole disk, which
+        // takes minutes before anything appears.
+        if source.snapshot == nil, source.path == SourceOptions.wholeDisk,
+           !CommandLine.arguments.contains(SourceOptions.wholeDisk) {
             source.path = Self.defaultPath
         }
         let snapshot = try source.load(summary: false)

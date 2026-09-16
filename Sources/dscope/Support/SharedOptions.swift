@@ -7,13 +7,29 @@ struct SourceOptions: ParsableArguments {
 
     static let wholeDisk = "/"
 
-    @Argument(help: "Directory to scan, or a snapshot file to read. Defaults to the whole disk.")
+    @Argument(help: "Directory to scan. Defaults to the whole disk.")
     var path: String = SourceOptions.wholeDisk
 
+    @Option(
+        name: [.customShort("S"), .long],
+        help: ArgumentHelp(
+            "Read a saved scan instead of scanning.",
+            discussion: "Written by 'dscope scan --save'. Answers in a second where a scan takes minutes.",
+            valueName: "file"
+        )
+    )
+    var snapshot: String?
+
     /// Creates options for a command that takes its path some other way.
-    static func forPath(_ path: String, crossMounts: Bool = false, under: String? = nil) -> SourceOptions {
+    static func forPath(
+        _ path: String,
+        snapshot: String? = nil,
+        crossMounts: Bool = false,
+        under: String? = nil
+    ) -> SourceOptions {
         var options = SourceOptions()
         options.path = path
+        options.snapshot = snapshot
         options.crossMounts = crossMounts
         options.under = under
         return options
@@ -36,16 +52,24 @@ struct SourceOptions: ParsableArguments {
     ///   An interactive browser draws over that line immediately, so it only
     ///   adds a flash of text.
     func load(quiet: Bool = false, summary: Bool = true) throws -> Snapshot {
-        let url = URL(fileURLWithPath: path)
+        // A path always means "scan this". A saved scan is named explicitly,
+        // so a file and a directory never have to be told apart by guessing.
+        if let snapshot {
+            let expanded = (snapshot as NSString).expandingTildeInPath
+            guard FileManager.default.fileExists(atPath: expanded) else {
+                throw ValidationError("no such snapshot: \(snapshot)")
+            }
+            return try narrow(try SnapshotFile.read(from: URL(fileURLWithPath: expanded)))
+        }
 
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
             throw ValidationError("no such file or directory: \(path)")
         }
-
-        if !isDirectory.boolValue {
-            let snapshot = try SnapshotFile.read(from: url)
-            return try narrow(snapshot)
+        guard isDirectory.boolValue else {
+            throw ValidationError(
+                "\(path) is a file. To read a saved scan, pass it as --snapshot \(path)"
+            )
         }
 
         let scanner = DiskScanner(options: ScanOptions(crossMountPoints: crossMounts))

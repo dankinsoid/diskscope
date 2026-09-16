@@ -24,8 +24,14 @@ struct SearchCommand: ParsableCommand {
     @Argument(help: ArgumentHelp("Name to match, as with --name.", valueName: "pattern"))
     var pattern: String?
 
-    @Argument(help: "Directory to scan, or a snapshot file to read.")
+    @Argument(help: "Directory to scan. Defaults to the whole disk.")
     var path: String = SourceOptions.wholeDisk
+
+    @Option(
+        name: [.customShort("S"), .long],
+        help: ArgumentHelp("Read a saved scan instead of scanning.", valueName: "file")
+    )
+    var snapshot: String?
 
     @Flag(name: .long, help: "Cross mount points, counting other volumes too.")
     var crossMounts = false
@@ -59,23 +65,6 @@ struct SearchCommand: ParsableCommand {
             || filter.filesOnly || filter.dirsOnly || filter.unreadable
     }
 
-    /// Whether the first positional is really the path.
-    ///
-    /// `search --size +1GB ~/disk.dscope` gives one positional, and it is the
-    /// path, not a pattern. Anything that resolves to an existing file or
-    /// directory is taken as the path when no explicit pattern condition is set.
-    private var pathOnlyInvocation: Bool {
-        // Only when no second positional was given: with both present the first
-        // is the pattern, however much it looks like a path.
-        guard let pattern, path == SourceOptions.wholeDisk else { return false }
-
-        // An explicit --name means any positional left over must be the path.
-        if filter.name != nil { return true }
-
-        let expanded = (pattern as NSString).expandingTildeInPath
-        return FileManager.default.fileExists(atPath: expanded)
-    }
-
     func run() throws {
         var filter = filter
         if let mode {
@@ -83,9 +72,9 @@ struct SearchCommand: ParsableCommand {
             filter.glob = mode == .glob
             filter.regex = mode == .regex
         }
-        let conditions = try filter.build(defaultPattern: pathOnlyInvocation ? nil : pattern)
+        let conditions = try filter.build(defaultPattern: pattern)
         let source = SourceOptions.forPath(
-            pathOnlyInvocation ? (pattern ?? path) : path, crossMounts: crossMounts, under: under
+            path, snapshot: snapshot, crossMounts: crossMounts, under: under
         )
         let snapshot = try source.load(quiet: format.json)
 
@@ -100,7 +89,7 @@ struct SearchCommand: ParsableCommand {
         if format.json {
             try Output.emit(
                 SearchReportJSON(
-                    query: filter.name ?? (pathOnlyInvocation ? "" : pattern ?? ""),
+                    query: filter.name ?? pattern ?? "",
                     mode: filter.mode,
                     matches: matches,
                     truncated: truncated

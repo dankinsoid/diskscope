@@ -22,10 +22,16 @@ once and query it repeatedly:
 dscope scan / --save /tmp/disk.dscope --json > /dev/null
 ```
 
-Pass the snapshot path wherever a directory would go:
+Reading a snapshot costs about a second, and the CLI re-reads it on every
+command. When several questions are coming, prefer the MCP server if it is
+available: it keeps snapshots in memory between calls, which halves the time for
+three queries and saves more as they multiply.
+
+A positional path is always scanned; a saved scan is named with `--snapshot`:
 
 ```bash
-dscope top /tmp/home.dscope --json --count 20
+dscope top --snapshot /tmp/disk.dscope --json --count 20
+dscope search --snapshot /tmp/disk.dscope --name .build --size +500MB --json
 ```
 
 To refresh a snapshot, use `dscope update` rather than scanning again: it asks
