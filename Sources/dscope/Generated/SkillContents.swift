@@ -96,6 +96,7 @@ narrows the result further, as find(1) predicates do.
 | `--size +1GB` / `--size 'over 1GB'` | at least that big |
 | `--size 'under 100MB'` | at most that big |
 | `--accessed '+6m'` / `--accessed 'over 6m'` | not read for six months |
+| | for a directory this is the newest access *beneath* it |
 | `--modified 'within 7d'` | written in the last week |
 | `--files-only` / `--dirs-only` | one kind only |
 | `--unreadable` | only entries that could not be read |

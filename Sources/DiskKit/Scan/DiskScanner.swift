@@ -177,6 +177,17 @@ public final class DiskScanner: @unchecked Sendable {
 
         descend(into: subdirectories, deviceID: deviceID)
 
+        // The newest access anywhere below, which is what "last used" means for
+        // a directory; its own atime does not move when a file inside is read.
+        var newestAccess = directory.accessed
+        for child in children {
+            guard let childAccess = child.accessed else { continue }
+            if newestAccess == nil || childAccess > newestAccess! {
+                newestAccess = childAccess
+            }
+        }
+        directory.accessed = newestAccess
+
         for subdirectory in subdirectories {
             ownSize += subdirectory.size
             ownFiles += subdirectory.fileCount

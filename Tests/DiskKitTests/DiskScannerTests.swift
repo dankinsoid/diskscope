@@ -167,3 +167,56 @@ extension DiskScannerTests {
         #expect(duplicates == 0)
     }
 }
+
+extension DiskScannerTests {
+
+    @Test("a directory's last use is the newest access beneath it")
+    func rollsUpAccessTimes() throws {
+        let root = try makeTree { root in
+            let deep = root.appendingPathComponent("stale/deeper")
+            try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+            try Data(repeating: 1, count: 2_000).write(to: deep.appendingPathComponent("fresh.bin"))
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        // Age the directories while leaving the file recently read. Reading a
+        // file does not touch the access time of the directory holding it, so
+        // this is the ordinary state of a tree in daily use.
+        let ancient = Date(timeIntervalSince1970: 1_577_836_800)
+        for directory in ["stale", "stale/deeper"] {
+            try FileManager.default.setAttributes(
+                [.modificationDate: ancient],
+                ofItemAtPath: root.appendingPathComponent(directory).path
+            )
+        }
+
+        let tree = DiskScanner().scan(path: root.path)
+        let stale = try #require(tree.children.first { $0.name == "stale" })
+        let file = try #require(
+            stale.children.first?.children.first { $0.name == "fresh.bin" }
+        )
+
+        let directoryAccess = try #require(stale.accessed)
+        let fileAccess = try #require(file.accessed)
+
+        // Reporting the directory's own timestamp would call a tree in use
+        // today untouched since 2020, and invite deleting it.
+        #expect(directoryAccess >= fileAccess)
+        #expect(abs(directoryAccess.timeIntervalSinceNow) < 300)
+    }
+
+    @Test("an empty directory keeps its own access time")
+    func keepsOwnAccessWhenEmpty() throws {
+        let root = try makeTree { root in
+            try FileManager.default.createDirectory(
+                at: root.appendingPathComponent("empty"), withIntermediateDirectories: false
+            )
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let tree = DiskScanner().scan(path: root.path)
+        let empty = try #require(tree.children.first { $0.name == "empty" })
+
+        #expect(empty.accessed != nil)
+    }
+}

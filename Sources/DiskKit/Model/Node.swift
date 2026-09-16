@@ -26,6 +26,13 @@ public final class Node: @unchecked Sendable {
     public internal(set) var fileCount: Int
 
     public internal(set) var modified: Date?
+
+    /// When this entry was last read.
+    ///
+    /// For a directory this is the most recent access anywhere beneath it, not
+    /// the directory's own timestamp: reading a file does not touch the access
+    /// time of the directory holding it, so the directory's own figure would
+    /// report a tree in daily use as untouched for years.
     public internal(set) var accessed: Date?
 
     public internal(set) var children: [Node]

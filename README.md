@@ -105,6 +105,10 @@ the words `over`, `under` and `within` where a leading dash would be read as a
 flag. Time units are `h d w m y`. A trailing slash — `--name 'build/'` — means
 directories only.
 
+A directory's last use is the newest access anywhere beneath it. Reading a file
+does not touch the access time of the directory holding it, so its own
+timestamp would report a tree you work in daily as untouched for years.
+
 `--under` re-roots a snapshot on a subtree, so looking inside one directory
 costs nothing:
 
