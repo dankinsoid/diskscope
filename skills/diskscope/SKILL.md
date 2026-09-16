@@ -8,6 +8,30 @@ description: Find what is using disk space and delete safely with dscope. Use wh
 `dscope` measures disk usage and deletes what the user chooses. Every command
 takes `--json`; use it and read the fields rather than parsing text.
 
+## What a good answer looks like
+
+When someone asks where their disk went, the answer is **an account of all of
+it**, not a list of the largest things. Every gigabyte in use belongs somewhere
+in your summary, and every figure you give comes from a command you ran.
+
+Naming the categories is your job — the tool reports paths and sizes, and what
+a path *means* is something only you can say. Deciding that
+`~/Library/Developer/Xcode` is "Xcode build output" is judgement; inventing its
+size, or calling something "system files, probably safe" without having
+measured it, is not.
+
+So: **every size you print comes from a command you ran; every name you give a
+category comes from you.**
+
+- Break the disk into categories and subcategories, each with its size and its
+  share of the total.
+- The categories must add up to what is in use. Where they do not, name the
+  remainder — "everything else, 25.7 GB" — rather than leaving it unexplained.
+- If you cannot tell what something is, say so and give its size. An honest
+  "18 GB in ~/Library/Containers, unidentified" beats a confident guess.
+- Finish with a cleanup plan: what can go, how much it frees, and what must
+  stay.
+
 Always name the command — `dscope scan`, `dscope search`. A bare `dscope`, or
 `dscope <path>`, opens an interactive browser when stdout is a terminal, which
 is not what you want from a tool call.
@@ -201,6 +225,33 @@ pool once.
 ```bash
 dscope scan --all-volumes --save /tmp/dscope-session.dscope --json > /dev/null
 ```
+
+## Accounting for all of it
+
+The sizes of a directory's children always add up to the directory, so a full
+breakdown is arithmetic rather than guesswork. Walk down from the root, taking
+whatever is large enough to matter and folding the rest into a remainder you
+name explicitly.
+
+```bash
+# 1. the top level, with nothing hidden
+dscope scan --snapshot /tmp/dscope-session.dscope --depth 1 --min 0 --json
+
+# 2. open up whichever of those is worth splitting further
+dscope scan --snapshot /tmp/dscope-session.dscope --under ~/Library --depth 1 --min 0 --json
+```
+
+`--min 0` matters: the default hides small entries, and a breakdown that hides
+things cannot add up. Sum the children you are naming, subtract from the
+parent, and report the difference as its own line.
+
+Then account for what no directory tree contains, using the `accounting` object
+and `dscope volumes --json` (see below). A summary that stops at the tree total
+is short by however much those hold — on one machine that was 47 GB of a 434 GB
+disk, which is not a rounding error.
+
+Present it as a table of categories with sizes and shares, subcategories where
+they help, and a remainder line so the figures visibly total what is in use.
 
 ## Judging what is safe
 
