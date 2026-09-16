@@ -14,6 +14,11 @@ struct SourceOptions: ParsableArguments {
     @Option(name: .long, help: "Limit a snapshot to this subtree, e.g. --under ~/Library.")
     var under: String?
 
+    /// Size a previous scan of this path reported, when one is at hand.
+    ///
+    /// Used only to give the progress bar a denominator.
+    var previousSize: Int64?
+
     func load(quiet: Bool = false) throws -> Snapshot {
         let url = URL(fileURLWithPath: path)
 
@@ -28,7 +33,12 @@ struct SourceOptions: ParsableArguments {
         }
 
         let scanner = DiskScanner(options: ScanOptions(crossMountPoints: crossMounts))
-        let progress = quiet ? nil : ProgressReporter(scanner: scanner)
+        let progress = quiet
+            ? nil
+            : ProgressReporter(
+                scanner: scanner,
+                estimate: ScanEstimate.of(path: path, previous: previousSize)
+            )
         progress?.start()
 
         // Taken before walking: a change made mid-scan is then replayed by the

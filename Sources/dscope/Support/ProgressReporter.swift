@@ -10,10 +10,12 @@ final class ProgressReporter {
 
     private let scanner: DiskScanner
     private let interval: TimeInterval
+    private let estimate: ScanEstimate?
     private let state = State()
 
-    init(scanner: DiskScanner, interval: TimeInterval = 0.08) {
+    init(scanner: DiskScanner, estimate: ScanEstimate? = nil, interval: TimeInterval = 0.08) {
         self.scanner = scanner
+        self.estimate = estimate
         self.interval = interval
     }
 
@@ -66,12 +68,31 @@ final class ProgressReporter {
     private func render(frame: Int) {
         let progress = scanner.progress
         let spinner = Self.spinnerFrames[frame % Self.spinnerFrames.count]
-        let counts = "\(progress.bytes.formattedBytes())  \(formatted(progress.files)) files"
-        let path = shorten(progress.current, reserving: counts.count + 6)
+
+        // "15 GB / 494 GB" rather than a bare percentage: the denominator is an
+        // estimate, and showing it says where the number comes from. Without one
+        // the total reads "?", which is the honest answer — the size of a tree
+        // is not knowable until it has been walked.
+        var counts: String
+        if let estimate {
+            let fraction = estimate.fraction(scanned: progress.bytes)
+            counts = "\(bar(fraction)) \(progress.bytes.formattedBytes()) / \(estimate.totalBytes.formattedBytes())"
+        } else {
+            counts = "\(progress.bytes.formattedBytes()) / ?"
+        }
+        counts += "  \(formatted(progress.files)) files"
+
+        let path = shorten(progress.current, reserving: counts.count + 4)
 
         // Dim everything: a bright full-width line reads like editable input
         // rather than a status that is about to be erased.
         write(clearLine + dim("\(spinner) \(counts)  \(path)"))
+    }
+
+    private func bar(_ fraction: Double) -> String {
+        let width = 12
+        let filled = Int((fraction * Double(width)).rounded())
+        return String(repeating: "━", count: filled) + String(repeating: "─", count: width - filled)
     }
 
     private static let spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]

@@ -25,6 +25,12 @@ struct ScanCommand: ParsableCommand {
     var save: String?
 
     func run() throws {
+        var source = source
+        // A previous scan of the same path is the only honest denominator for
+        // a progress bar, so reuse the snapshot about to be overwritten.
+        if let save, let existing = try? SnapshotFile.read(from: URL(fileURLWithPath: save)) {
+            source.previousSize = existing.totalSize
+        }
         let snapshot = try source.load(quiet: format.json)
 
         if let save {
