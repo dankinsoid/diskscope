@@ -70,9 +70,8 @@ struct FilterOptions: ParsableArguments {
         if filesOnly, dirsOnly {
             throw ValidationError("--files-only and --dirs-only exclude each other")
         }
-        if (glob || regex || path), name == nil {
-            throw ValidationError("--glob, --regex and --path describe --name, which was not given")
-        }
+        // Whether a pattern was given cannot be judged here: a command may take
+        // one positionally, and only it knows.
     }
 
     var mode: MatchMode {

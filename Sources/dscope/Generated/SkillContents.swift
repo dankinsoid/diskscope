@@ -173,6 +173,10 @@ dscope clean '.build' ~/Code --glob --size +500MB --except project-a --apply --y
 Deletion moves items to the Trash, so it is recoverable — pass `--permanent`
 only when the user explicitly asks.
 
+A deleted `.build` or `.git` lands in the Trash under its own name, which begins
+with a dot, and the Finder hides those: the Trash can look empty when it is not.
+Tell the user to press Cmd-Shift-. there, or to check with `ls -a ~/.Trash`.
+
 `clean` accepts `--snapshot` for planning, but deletion always works against the
 live filesystem: paths are re-checked and anything already gone is reported
 rather than assumed. Sizes from a snapshot may therefore differ slightly from

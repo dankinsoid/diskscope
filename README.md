@@ -125,6 +125,10 @@ would free 7.0 GB from 2 entries — re-run with --apply
 
 Items move to the Trash, so a mistake is recoverable. `--permanent` skips it.
 
+A directory whose name begins with a dot — `.build`, `.gradle` — keeps that name
+in the Trash, and the Finder hides dotfiles: the Trash can look empty when it is
+not. Press Cmd-Shift-. there, or check with `ls -a ~/.Trash`.
+
 ### Machine-readable output
 
 ```console

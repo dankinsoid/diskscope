@@ -58,6 +58,9 @@ struct SearchCommand: ParsableCommand {
         if filter.name == nil, pattern == nil, !hasNonNameCondition {
             throw ValidationError("give something to match: a pattern, --size, --accessed or --modified")
         }
+        if filter.glob || filter.regex || filter.path, filter.name == nil, pattern == nil {
+            throw ValidationError("--glob, --regex and --path describe a pattern, which was not given")
+        }
     }
 
     private var hasNonNameCondition: Bool {
