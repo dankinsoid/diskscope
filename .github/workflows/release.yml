@@ -18,6 +18,12 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
+      - name: Stamp the version into the binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i '' "s|version: \"[0-9.]*\"|version: \"$VERSION\"|" Sources/dscope/DScope.swift
+          grep -n "version:" Sources/dscope/DScope.swift
+
       - name: Build for both architectures
         run: |
           swift build -c release --arch arm64 --arch x86_64
