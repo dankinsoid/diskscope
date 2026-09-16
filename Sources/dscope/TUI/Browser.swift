@@ -39,6 +39,16 @@ final class Browser {
 
         draw()
         loop: while true {
+            // A query the typing left pending is searched for once the keyboard
+            // goes quiet: on a large tree each search takes seconds, and running
+            // one per keystroke makes the field unusable. The wait is short
+            // enough to feel immediate and long enough to skip the letters of a
+            // word typed at speed.
+            if state.hasPendingQuery, !terminal.waitForInput(timeout: 0.12) {
+                state.applyPendingSearch()
+                draw()
+            }
+
             guard let key = terminal.readKey() else { break }
 
             let keys = [key]

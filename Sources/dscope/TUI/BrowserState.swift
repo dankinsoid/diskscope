@@ -46,6 +46,9 @@ struct BrowserState {
         var mode: MatchMode
         var isEditing: Bool
         var error: String?
+
+        /// Set while the query has changed but has not been searched for yet.
+        var isPending = false
     }
 
     init(snapshot: Snapshot) {
@@ -186,10 +189,27 @@ struct BrowserState {
         scroll = 0
     }
 
+    /// Records a change to the query without searching for it.
+    ///
+    /// Searching a tree of millions of entries takes seconds, and doing it per
+    /// keystroke makes typing unusable. The caller runs the search once the
+    /// typing pauses.
     mutating func updateSearch(_ transform: (inout String) -> Void) {
         guard var state = search else { return }
         transform(&state.query)
+        state.isPending = true
         search = state
+    }
+
+    /// Whether a query is waiting to be searched for.
+    var hasPendingQuery: Bool {
+        search?.isPending == true
+    }
+
+    /// Runs the search the typing has been waiting on.
+    mutating func applyPendingSearch() {
+        guard search?.isPending == true else { return }
+        search?.isPending = false
         runSearch()
     }
 

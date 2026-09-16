@@ -110,7 +110,7 @@ final class Terminal {
     }
 
     /// Waits up to `timeout` seconds for a byte to become readable.
-    private func waitForInput(timeout: TimeInterval) -> Bool {
+    func waitForInput(timeout: TimeInterval) -> Bool {
         var descriptor = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
         return poll(&descriptor, 1, Int32(timeout * 1000)) > 0
     }
