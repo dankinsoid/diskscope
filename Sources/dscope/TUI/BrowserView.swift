@@ -44,9 +44,13 @@ enum BrowserView {
             return entry + String(repeating: " ", count: padding) + Style.dim(hint)
         }
 
-        let path = truncate(state.current.path, to: width - 24)
+        let path = truncate(state.current.path, to: width - 32)
         let size = state.current.size.formattedBytes()
-        return Style.bold(path) + Style.dim("  \(size)  \(state.rows.count) entries")
+
+        // Position in the list, so a long directory does not leave you guessing
+        // where you are or how much is below.
+        let position = state.rows.isEmpty ? "" : "  \(state.cursor + 1)/\(state.rows.count)"
+        return Style.bold(path) + Style.dim("  \(size)\(position)")
     }
 
     private static func body(_ state: BrowserState, width: Int, height: Int) -> [String] {
@@ -84,7 +88,11 @@ enum BrowserView {
             label = node.name + (node.isDirectory ? "/" : "")
         }
 
-        let prefix = "\(marker) \(size) \(share) "
+        // An arrow as well as the inverted row: reverse video is easy to lose
+        // against some terminal themes, and the cursor is the one thing that
+        // must always be findable.
+        let pointer = isCursor ? "▸" : " "
+        let prefix = "\(pointer)\(marker) \(size) \(share) "
         let name = truncate(label, to: max(4, width - prefix.count - 1))
         let line = prefix + name
 

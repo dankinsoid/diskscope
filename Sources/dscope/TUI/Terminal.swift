@@ -52,6 +52,9 @@ final class Terminal {
 
         write("\u{1B}[?1049h")  // Alternate screen, so the shell scrollback survives.
         write("\u{1B}[?25l")
+        // Ask for wheel events in SGR form. Without this the terminal scrolls
+        // its own buffer, which on the alternate screen does nothing at all.
+        write("\u{1B}[?1000h\u{1B}[?1006h")
         isActive = true
 
         Terminal.active = self
@@ -72,6 +75,7 @@ final class Terminal {
     func deactivate() {
         guard isActive else { return }
         Terminal.active = nil
+        write("\u{1B}[?1006l\u{1B}[?1000l")
         write("\u{1B}[?25h")
         write("\u{1B}[?1049l")
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
@@ -171,7 +175,14 @@ final class Terminal {
     private func readEscapeSequence() -> Key {
         var next: UInt8 = 0
         // A lone Escape is a key in its own right; anything else is a sequence.
-        guard read(STDIN_FILENO, &next, 1) == 1, next == 0x5B else { return .escape }
+        guard read(STDIN_FILENO, &next, 1) == 1 else { return .escape }
+        guard next == 0x5B else {
+            // ESC O introduces the arrow keys some terminals send in
+            // application mode; anything else starts the next keystroke.
+            if next == 0x4F { return readApplicationKey() }
+            pushedBack = next
+            return .escape
+        }
 
         var final: UInt8 = 0
         guard read(STDIN_FILENO, &final, 1) == 1 else { return .escape }
@@ -185,7 +196,60 @@ final class Terminal {
         case 0x36: _ = readTrailingTilde(); return .pageDown
         case 0x48: return .home
         case 0x46: return .end
-        default: return .escape
+        case 0x3C: return readMouseReport()
+        default:
+            // An unrecognised sequence still has to be consumed to its final
+            // byte. Leaving the rest in the stream turns one scroll of the
+            // wheel into a burst of stray keys — including ones that quit.
+            discardSequence(startingWith: final)
+            return .unknown
+        }
+    }
+
+    /// Arrow keys in application mode: `ESC O A` and friends.
+    private func readApplicationKey() -> Key {
+        var final: UInt8 = 0
+        guard read(STDIN_FILENO, &final, 1) == 1 else { return .escape }
+
+        switch final {
+        case 0x41: return .up
+        case 0x42: return .down
+        case 0x43: return .right
+        case 0x44: return .left
+        default: return .unknown
+        }
+    }
+
+    /// An SGR mouse report: `ESC [ < button ; column ; row M or m`.
+    ///
+    /// Wheel movement is the part worth acting on; buttons 64 and 65 are scroll
+    /// up and down, and everything else is a click this program ignores.
+    private func readMouseReport() -> Key {
+        var digits: [UInt8] = []
+        var byte: UInt8 = 0
+
+        while read(STDIN_FILENO, &byte, 1) == 1 {
+            if byte == 0x4D || byte == 0x6D { break }  // 'M' or 'm' ends it.
+            digits.append(byte)
+        }
+
+        let fields = String(decoding: digits, as: UTF8.self).split(separator: ";")
+        guard let button = fields.first.flatMap({ Int($0) }) else { return .unknown }
+
+        switch button {
+        case 64: return .scrollUp
+        case 65: return .scrollDown
+        default: return .unknown
+        }
+    }
+
+    /// Consumes the remainder of a CSI sequence, which ends at 0x40...0x7E.
+    private func discardSequence(startingWith first: UInt8) {
+        guard !(0x40 ... 0x7E).contains(first) else { return }
+
+        var byte: UInt8 = 0
+        while read(STDIN_FILENO, &byte, 1) == 1 {
+            if (0x40 ... 0x7E).contains(byte) { return }
         }
     }
 
@@ -198,6 +262,11 @@ final class Terminal {
 enum Key: Equatable {
     case character(Character)
     case up, down, left, right
+    case scrollUp, scrollDown
     case pageUp, pageDown, home, end
     case enter, escape, space, backspace, interrupt
+
+    /// A recognised-but-unhandled sequence, consumed so it cannot be mistaken
+    /// for the keys its bytes spell out.
+    case unknown
 }

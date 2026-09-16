@@ -81,6 +81,12 @@ final class Browser {
             state.move(by: -1)
         case .down, .character("j"):
             state.move(by: 1)
+        case .scrollUp:
+            state.move(by: -3)
+        case .scrollDown:
+            state.move(by: 3)
+        case .unknown:
+            break
         case .pageUp:
             state.move(by: -(terminal.size.rows - 6))
         case .pageDown:
