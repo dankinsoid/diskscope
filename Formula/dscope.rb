@@ -1,8 +1,8 @@
 class Dscope < Formula
   desc "Find what is eating your disk space"
   homepage "https://github.com/dankinsoid/diskscope"
-  version "0.0.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  version "1.0.0"
+  sha256 "edcffef38e06b35525426eaacc268121127e289d4b040450da63711ea259f059"
   license "MIT"
 
   url "https://github.com/dankinsoid/diskscope/releases/download/v#{version}/dscope-#{version}-macos.tar.gz"
