@@ -11,7 +11,7 @@ struct CleanCommand: ParsableCommand {
         Shows what would be deleted and stops. Pass --apply to actually delete, \
         and --except to keep specific matches:
 
-          dscope clean '.build' ~/Code --except tabby-app-ios --apply
+          dscope clean '.build' ~/Code --except the-one-im-working-on --apply
 
         Deletion moves items to the Trash unless --permanent is given.
         """
