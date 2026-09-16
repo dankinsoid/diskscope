@@ -36,6 +36,7 @@ struct DScope: ParsableCommand {
             AccessCommand.self,
             UpdateCommand.self,
             InfoCommand.self,
+            DoctorCommand.self,
         ],
         defaultSubcommand: ScanCommand.self
     )
@@ -52,7 +53,7 @@ struct DScope: ParsableCommand {
         // Listed explicitly: reading them back off `configuration` would refer
         // to the property being initialised.
         let names: Set<String> = [
-            "browse", "scan", "search", "top", "clean", "volumes", "access", "update", "info", "help",
+            "browse", "scan", "search", "top", "clean", "volumes", "access", "update", "info", "doctor", "help",
         ]
         if let first = arguments.first {
             // A flag like --help or --version, or an explicit command, is meant

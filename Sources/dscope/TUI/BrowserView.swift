@@ -23,11 +23,24 @@ enum BrowserView {
 
     private static func header(_ state: BrowserState, width: Int) -> String {
         if let search = state.search {
-            let caret = search.isEditing ? "▌" : ""
-            let label = "search (\(search.mode.rawValue)): \(search.query)\(caret)"
-            let note = search.error.map { Style.dim("  \($0)") }
-                ?? Style.dim("  \(state.rows.count) matches")
-            return Style.bold(truncate(label, to: width - 16)) + note
+            let label = search.mode == .regex ? "regex" : "search"
+            let typed = truncate(search.query, to: max(8, width - 40))
+
+            // An empty query has not been answered yet; saying "0 matches"
+            // reads as a result and makes the box look broken.
+            let note: String
+            if let error = search.error {
+                note = Style.dim("  \(error)")
+            } else if search.query.isEmpty {
+                note = Style.dim("  type to search, esc to cancel")
+            } else {
+                note = Style.dim("  \(state.rows.count) matches")
+            }
+
+            // The caret stays bright while the field has focus: everything else
+            // on screen is dim, so a dim caret does not read as an input.
+            let caret = search.isEditing ? Style.inverted(" ") : ""
+            return Style.bold("\(label): ") + typed + caret + note
         }
 
         let path = truncate(state.current.path, to: width - 24)
@@ -37,7 +50,13 @@ enum BrowserView {
 
     private static func body(_ state: BrowserState, width: Int, height: Int) -> [String] {
         guard !state.rows.isEmpty else {
-            let message = state.isSearching ? "no matches" : "empty"
+            // With nothing typed yet there is no search to have failed.
+            let message: String
+            if let search = state.search, search.query.isEmpty {
+                message = "searching \(state.snapshot.rootPath) and everything under it"
+            } else {
+                message = state.isSearching ? "no matches" : "empty"
+            }
             return [Style.dim("  " + message)] + Array(repeating: "", count: height - 1)
         }
 

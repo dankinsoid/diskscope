@@ -39,6 +39,14 @@ struct BrowseCommand: ParsableCommand {
     }
 
     func run() throws {
+        if let terminal = Terminal.mayNotDeliverInput {
+            Output.note(
+                "\(terminal) may not pass keystrokes to a full-screen program. "
+                    + "If nothing responds, press Ctrl-C and run 'dscope doctor', "
+                    + "or use 'dscope scan' and 'dscope search' instead."
+            )
+        }
+
         var source = source
         if source.path == SourceOptions.wholeDisk, !CommandLine.arguments.contains(SourceOptions.wholeDisk) {
             source.path = Self.defaultPath

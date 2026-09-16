@@ -6,6 +6,12 @@ final class Terminal {
     private var original = termios()
     private(set) var isActive = false
 
+    /// The terminal to restore if the process is killed mid-session.
+    ///
+    /// A signal bypasses `defer`, so without this a Ctrl-C leaves the terminal
+    /// in raw mode with no cursor and the alternate screen still showing.
+    private nonisolated(unsafe) static var active: Terminal?
+
     var size: (rows: Int, columns: Int) {
         var window = winsize()
         guard ioctl(STDOUT_FILENO, TIOCGWINSZ, &window) == 0, window.ws_row > 0 else {
@@ -18,13 +24,30 @@ final class Terminal {
         isatty(STDIN_FILENO) == 1 && isatty(STDOUT_FILENO) == 1
     }
 
+    /// Terminals that run commands as blocks rather than as a live session, and
+    /// do not reliably hand keystrokes to a full-screen program.
+    ///
+    /// Reported rather than refused: the list cannot be complete, and a version
+    /// that works should not be blocked by its name.
+    static var mayNotDeliverInput: String? {
+        switch ProcessInfo.processInfo.environment["TERM_PROGRAM"] {
+        case "WarpTerminal": "Warp"
+        default: nil
+        }
+    }
+
     func activate() {
         guard !isActive else { return }
         tcgetattr(STDIN_FILENO, &original)
 
         var raw = original
         // Disable line buffering and echo so keys arrive as they are pressed.
-        raw.c_lflag &= ~(UInt(ECHO) | UInt(ICANON) | UInt(ISIG) | UInt(IEXTEN))
+        //
+        // ISIG stays on deliberately: if anything about the terminal keeps this
+        // program from reading input, Ctrl-C must still kill it. Handling that
+        // byte ourselves would leave no way out of a session that is not
+        // responding.
+        raw.c_lflag &= ~(UInt(ECHO) | UInt(ICANON) | UInt(IEXTEN))
         raw.c_iflag &= ~(UInt(IXON) | UInt(ICRNL))
         raw.c_oflag &= ~UInt(OPOST)
         // c_cc is a tuple; taking a pointer to the whole struct keeps the write
@@ -42,10 +65,25 @@ final class Terminal {
         write("\u{1B}[?1049h")  // Alternate screen, so the shell scrollback survives.
         write("\u{1B}[?25l")
         isActive = true
+
+        Terminal.active = self
+        Terminal.installSignalHandlers()
+    }
+
+    /// Restores the terminal when a signal would otherwise skip the cleanup.
+    private static func installSignalHandlers() {
+        for signalNumber in [SIGINT, SIGTERM, SIGHUP] {
+            signal(signalNumber) { number in
+                Terminal.active?.deactivate()
+                signal(number, SIG_DFL)
+                raise(number)
+            }
+        }
     }
 
     func deactivate() {
         guard isActive else { return }
+        Terminal.active = nil
         write("\u{1B}[?25h")
         write("\u{1B}[?1049l")
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
