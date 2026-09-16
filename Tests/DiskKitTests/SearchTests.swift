@@ -125,3 +125,43 @@ struct SearchTests {
         #expect(snapshot.search(Filter()).isEmpty)
     }
 }
+
+extension SearchTests {
+
+    @Test("substring matching is case-insensitive both ways")
+    func matchesRegardlessOfCase() throws {
+        let snapshot = makeTreeForCase()
+
+        #expect(snapshot.search(Filter(pattern: try Pattern("readme"))).count == 1)
+        #expect(snapshot.search(Filter(pattern: try Pattern("README"))).count == 1)
+        #expect(snapshot.search(Filter(pattern: try Pattern("ReAdMe"))).count == 1)
+        #expect(snapshot.search(Filter(pattern: try Pattern("DERIVED"))).count == 1)
+    }
+
+    @Test("non-ASCII queries still match")
+    func matchesNonASCII() throws {
+        let snapshot = makeTreeForCase()
+
+        #expect(snapshot.search(Filter(pattern: try Pattern("Документы"))).count == 1)
+        #expect(snapshot.search(Filter(pattern: try Pattern("кумен"))).count == 1)
+    }
+
+    @Test("a query longer than the name matches nothing")
+    func rejectsOverlongQuery() throws {
+        let snapshot = makeTreeForCase()
+        #expect(snapshot.search(Filter(pattern: try Pattern("README.markdown.extra"))).isEmpty)
+    }
+
+    private func makeTreeForCase() -> Snapshot {
+        let root = Node(name: "/case", kind: .directory, size: 400, fileCount: 3)
+        let names = ["README.md", "DerivedData", "Документы"]
+        var children: [Node] = []
+        for name in names {
+            let child = Node(name: name, kind: .file, size: 100, fileCount: 1)
+            child.parent = root
+            children.append(child)
+        }
+        root.children = children
+        return Snapshot(root: root, rootPath: "/case")
+    }
+}

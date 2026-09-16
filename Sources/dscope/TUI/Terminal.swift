@@ -27,11 +27,15 @@ final class Terminal {
         raw.c_lflag &= ~(UInt(ECHO) | UInt(ICANON) | UInt(ISIG) | UInt(IEXTEN))
         raw.c_iflag &= ~(UInt(IXON) | UInt(ICRNL))
         raw.c_oflag &= ~UInt(OPOST)
-        withUnsafeMutablePointer(to: &raw.c_cc) { pointer in
-            pointer.withMemoryRebound(to: cc_t.self, capacity: Int(NCCS)) { cc in
-                cc[Int(VMIN)] = 1
-                cc[Int(VTIME)] = 0
-            }
+        // c_cc is a tuple; taking a pointer to the whole struct keeps the write
+        // aimed at `raw` itself, where a pointer to the field alone would land
+        // in a temporary copy and be discarded.
+        withUnsafeMutablePointer(to: &raw) { pointer in
+            let controls = UnsafeMutableRawPointer(pointer)
+                .advanced(by: MemoryLayout<termios>.offset(of: \.c_cc)!)
+                .assumingMemoryBound(to: cc_t.self)
+            controls[Int(VMIN)] = 1
+            controls[Int(VTIME)] = 0
         }
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)
 
@@ -60,6 +64,13 @@ final class Terminal {
         }
         output += "\u{1B}[J"  // Erase anything left below a shorter frame.
         write(output)
+    }
+
+    /// Whether more input is already waiting, so a burst can be drained before
+    /// redrawing. Typing arrives faster than a search over a large tree can run.
+    func hasPendingInput() -> Bool {
+        var descriptor = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
+        return poll(&descriptor, 1, 0) > 0
     }
 
     /// Blocks until a key is pressed.

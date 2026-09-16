@@ -154,7 +154,10 @@ struct BrowserState {
 
         do {
             let pattern = try Pattern(state.query, mode: state.mode)
-            rows = snapshot.searchTopmost(Filter(pattern: pattern), limit: 5_000, sortedBy: order)
+            // Only a screenful is ever shown, and a one-letter query matches
+            // most of a disk; collecting thousands of rows per keystroke is what
+            // makes typing lag behind.
+            rows = snapshot.searchTopmost(Filter(pattern: pattern), limit: 500, sortedBy: order)
             state.error = nil
         } catch {
             // An incomplete regex is expected while typing, not an error to shout about.

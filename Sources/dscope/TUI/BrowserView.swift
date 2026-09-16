@@ -93,14 +93,21 @@ enum BrowserView {
             return Style.dim("enter: keep results   esc: cancel")
         }
 
-        var parts: [String] = []
+        // Built from plain text and truncated before styling: escape codes take
+        // no columns, and counting them would trim the visible text too early.
+        var plain: [String] = []
         if !state.selection.isEmpty {
-            parts.append(Style.bold("\(state.selection.count) selected, \(state.selectionSize.formattedBytes())"))
+            plain.append("\(state.selection.count) selected, \(state.selectionSize.formattedBytes())")
         }
-        parts.append("↑↓ move  → enter  ← up  space select  a all  / search  s sort:\(state.order.rawValue)")
-        parts.append("d delete  q quit")
+        plain.append("↑↓ move  → enter  ← up  space mark  a all  / search  s sort:\(state.order.rawValue)")
+        plain.append("d trash  q quit")
 
-        return truncate(parts.joined(separator: Style.dim("  ·  ")), to: width + Style.overhead(parts.count))
+        let line = plain.joined(separator: "  ·  ")
+        guard line.count > width else {
+            return state.selection.isEmpty ? Style.dim(line) : Style.bold(plain[0]) + Style.dim(String(line.dropFirst(plain[0].count)))
+        }
+        // Keep the head, which carries the selection total, and drop the hints.
+        return Style.bold(String(line.prefix(width)))
     }
 
     // MARK: - Layout
@@ -123,6 +130,7 @@ enum BrowserView {
         visibleWindow(state: state, height: height)
     }
 
+    /// Trims from the left, so the tail of a long path stays visible.
     private static func truncate(_ text: String, to width: Int) -> String {
         guard width > 1, text.count > width else { return text }
         return "…" + String(text.suffix(width - 1))

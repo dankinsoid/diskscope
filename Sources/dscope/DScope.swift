@@ -12,7 +12,7 @@ struct DScope: ParsableCommand {
         usable from scripts and agents without the interactive interface.
         """,
         version: "0.1.0",
-        subcommands: [ScanCommand.self, SearchCommand.self, TopCommand.self, CleanCommand.self, VolumesCommand.self, AccessCommand.self, UpdateCommand.self, InfoCommand.self],
+        subcommands: [BrowseCommand.self, ScanCommand.self, SearchCommand.self, TopCommand.self, CleanCommand.self, VolumesCommand.self, AccessCommand.self, UpdateCommand.self, InfoCommand.self],
         defaultSubcommand: ScanCommand.self
     )
 }

@@ -69,6 +69,23 @@ back to a full scan and says which one happened. Tests assert the property that
 makes the whole thing worth having — an updated snapshot must equal a freshly
 scanned one, node for node.
 
+## The interactive browser
+
+A one-shot command answers a question you already know how to ask. Working out
+what is safe to delete is not that: you descend, back out, sort differently,
+search, and change your mind. Each of those as a fresh command means re-reading
+a snapshot and losing your place.
+
+The browser keeps that state. It draws whole frames into the alternate screen
+rather than scrolling, so the shell's scrollback survives, and it holds the
+snapshot in memory so navigation and search are instant.
+
+One measurement shaped it: a substring search over a million names took nearly
+four seconds per keystroke, because `range(of:options:)` with case and diacritic
+folding normalises Unicode for every candidate. Folding ASCII by hand and
+keeping the Unicode path for non-ASCII queries brought it under a second, which
+is the difference between typing and waiting.
+
 ## Selection
 
 Bulk selection is a primary workflow, not a convenience. The shape of it:

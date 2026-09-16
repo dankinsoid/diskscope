@@ -15,6 +15,14 @@ public struct Pattern: Sendable {
     public let text: String
     public let mode: MatchMode
     public let matchesFullPath: Bool
+
+    /// Lowercased UTF-8 of the query, for the fast path.
+    ///
+    /// `range(of:options:)` with case and diacritic folding costs a full Unicode
+    /// normalisation per candidate, which on a tree of a million names is
+    /// seconds per keystroke. Plain ASCII folding covers almost every real
+    /// query and is orders of magnitude cheaper.
+    private let asciiNeedle: [UInt8]?
     /// `NSRegularExpression` is safe to match from several threads at once,
     /// which `Regex` is not; searching a snapshot fans out across cores.
     private let regex: NSRegularExpression?
@@ -23,6 +31,8 @@ public struct Pattern: Sendable {
         self.text = text
         self.mode = mode
         self.matchesFullPath = matchesFullPath
+
+        asciiNeedle = text.allSatisfy(\.isASCII) ? Array(text.lowercased().utf8) : nil
 
         switch mode {
         case .substring:
@@ -38,12 +48,46 @@ public struct Pattern: Sendable {
         let subject = matchesFullPath ? node.path : node.name
         switch mode {
         case .substring:
+            if let asciiNeedle {
+                return Pattern.containsASCII(asciiNeedle, in: subject)
+            }
             return subject.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil
         case .glob, .regex:
             guard let regex else { return false }
             let range = NSRange(subject.startIndex ..< subject.endIndex, in: subject)
             return regex.firstMatch(in: subject, options: [], range: range) != nil
         }
+    }
+
+    /// Case-insensitive substring search over UTF-8, without normalising.
+    private static func containsASCII(_ needle: [UInt8], in subject: String) -> Bool {
+        guard !needle.isEmpty else { return true }
+
+        return subject.utf8.withContiguousStorageIfAvailable { haystack in
+            scan(needle, haystack)
+        } ?? scan(needle, Array(subject.utf8)[...])
+    }
+
+    private static func scan(_ needle: [UInt8], _ haystack: some Collection<UInt8>) -> Bool {
+        let bytes = Array(haystack)
+        guard bytes.count >= needle.count else { return false }
+
+        let first = needle[0]
+        for start in 0 ... (bytes.count - needle.count) {
+            guard lowercased(bytes[start]) == first else { continue }
+
+            var matched = true
+            for offset in 1 ..< needle.count where lowercased(bytes[start + offset]) != needle[offset] {
+                matched = false
+                break
+            }
+            if matched { return true }
+        }
+        return false
+    }
+
+    private static func lowercased(_ byte: UInt8) -> UInt8 {
+        byte >= 65 && byte <= 90 ? byte + 32 : byte
     }
 
     /// Translates `*` and `?` into an anchored regular expression.

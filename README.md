@@ -5,8 +5,7 @@ Find what is eating your disk space.
 `dscope` scans a directory once, saves the result, and then answers questions
 about it instantly — what is large, what is stale, and what can go.
 
-> Status: early development. The interactive interface is not built yet; every
-> capability is available from the command line.
+> Status: early development.
 
 ## Why another disk usage tool
 
@@ -24,6 +23,21 @@ this?"*, and that is what the tool is shaped around.
   same capabilities as a human.
 
 ## Usage
+
+Explore a scan interactively:
+
+```console
+$ dscope browse ~
+```
+
+Arrow keys or `hjkl` move, `→` enters a directory, `←` goes back. `/` searches
+the whole tree, `space` marks an entry and `a` marks everything currently
+listed. `d` moves what is marked to the Trash. Marking every search result and
+then unmarking the exceptions is the quickest way to clear out, say, every
+`.build` directory but one — the running total of what would be freed stays on
+screen.
+
+### One-shot commands
 
 Scan the whole disk — the default — showing the top level and hiding anything
 under 1 GB:

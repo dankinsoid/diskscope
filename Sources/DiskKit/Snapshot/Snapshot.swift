@@ -133,3 +133,23 @@ public extension Node {
         return false
     }
 }
+
+public extension Node {
+
+    /// Detaches this node from its parent, correcting every ancestor's totals.
+    ///
+    /// Used after a deletion so the tree in hand matches the disk without
+    /// rescanning it.
+    func detachFromParent() {
+        guard let parent else { return }
+        parent.children.removeAll { $0 === self }
+
+        var ancestor: Node? = parent
+        while let current = ancestor {
+            current.size -= size
+            current.fileCount -= fileCount
+            ancestor = current.parent
+        }
+        self.parent = nil
+    }
+}
