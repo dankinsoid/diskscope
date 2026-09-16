@@ -165,17 +165,21 @@ enum BrowserView {
 
     /// Scroll offset keeping the cursor on screen with a little context.
     private static func visibleWindow(state: BrowserState, height: Int) -> Int {
-        let margin = 2
         let total = state.displayCount
-        var scroll = state.scroll
+        let limit = max(0, total - height)
+        var scroll = min(state.scroll, limit)
+
+        // Keep a couple of rows of context around the cursor where there is
+        // room, but never at the cost of scrolling it off screen entirely.
+        let margin = min(2, max(0, (height - 1) / 2))
 
         if state.cursor < scroll + margin {
-            scroll = max(0, state.cursor - margin)
+            scroll = state.cursor - margin
         }
-        if state.cursor >= scroll + height - margin {
-            scroll = state.cursor - height + margin + 1
+        if state.cursor > scroll + height - 1 - margin {
+            scroll = state.cursor - height + 1 + margin
         }
-        return max(0, min(scroll, max(0, total - height)))
+        return max(0, min(scroll, limit))
     }
 
     static func scrollOffset(for state: BrowserState, height: Int) -> Int {

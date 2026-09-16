@@ -18,8 +18,15 @@ final class Browser {
         var word: String { method == .permanent ? "DELETE" : "yes" }
     }
 
-    init(snapshot: Snapshot) {
+    /// Whether wheel events move the list the opposite way.
+    ///
+    /// A terminal reports the wheel's direction, not the gesture, so macOS
+    /// "natural scrolling" arrives inverted and there is no way to detect it.
+    private let invertScroll: Bool
+
+    init(snapshot: Snapshot, invertScroll: Bool = false) {
         state = BrowserState(snapshot: snapshot)
+        self.invertScroll = invertScroll
     }
 
     /// Runs until the user quits. Returns paths deleted, for the caller to report.
@@ -60,6 +67,11 @@ final class Browser {
         return deleted
     }
 
+    /// Rows of list visible between the header and the footer.
+    private var viewportHeight: Int {
+        max(1, terminal.size.rows - 4)
+    }
+
     private func draw() {
         let size = terminal.size
         state.scroll = BrowserView.scrollOffset(for: state, height: max(1, size.rows - 4))
@@ -82,9 +94,9 @@ final class Browser {
         case .down, .character("j"):
             state.move(by: 1)
         case .scrollUp:
-            state.move(by: -3)
+            state.scroll(by: invertScroll ? 3 : -3, viewportHeight: viewportHeight)
         case .scrollDown:
-            state.move(by: 3)
+            state.scroll(by: invertScroll ? -3 : 3, viewportHeight: viewportHeight)
         case .unknown:
             break
         case .pageUp:

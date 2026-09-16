@@ -122,6 +122,20 @@ struct BrowserState {
         reload()
     }
 
+    /// Moves the view without moving the cursor, the way a scroll should.
+    ///
+    /// The cursor is dragged along only when the view would leave it behind, so
+    /// scrolling reads as moving the page rather than as pressing an arrow key.
+    mutating func scroll(by delta: Int, viewportHeight: Int) {
+        guard displayCount > viewportHeight else { return }
+
+        let maximum = Swift.max(0, displayCount - viewportHeight)
+        scroll = Swift.max(0, Swift.min(maximum, scroll + delta))
+
+        // Keep the cursor within what is now on screen.
+        cursor = Swift.max(scroll, Swift.min(scroll + viewportHeight - 1, cursor))
+    }
+
     mutating func move(by delta: Int) {
         guard displayCount > 0 else { return }
         cursor = Swift.max(0, Swift.min(displayCount - 1, cursor + delta))

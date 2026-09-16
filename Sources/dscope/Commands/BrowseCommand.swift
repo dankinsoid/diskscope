@@ -20,6 +20,12 @@ struct BrowseCommand: ParsableCommand {
 
     @OptionGroup var source: SourceOptions
 
+    @Flag(
+        name: .long,
+        help: "Reverse the scroll wheel, if it moves the list the wrong way."
+    )
+    var naturalScroll = false
+
     /// Where a bare `dscope` starts.
     ///
     /// The home directory rather than the whole disk: it holds what a person
@@ -47,7 +53,7 @@ struct BrowseCommand: ParsableCommand {
             source.path = Self.defaultPath
         }
         let snapshot = try source.load(summary: false)
-        let deleted = Browser(snapshot: snapshot).run()
+        let deleted = Browser(snapshot: snapshot, invertScroll: naturalScroll).run()
 
         // The browser draws on the alternate screen, which is restored on exit —
         // without this the terminal looks as though nothing ever ran.
