@@ -34,6 +34,9 @@ public final class Node: @unchecked Sendable {
     /// Set when the subtree could not be fully traversed, so `size` is a lower bound.
     public internal(set) var error: ScanError?
 
+    /// Scratch space used while a snapshot is being rebuilt.
+    var _pendingChildCount: Int = 0
+
     init(
         name: String,
         kind: Kind,
@@ -52,6 +55,22 @@ public final class Node: @unchecked Sendable {
         self.accessed = accessed
         self.children = children
         self.error = error
+    }
+
+    /// Releases the subtree without recursing.
+    ///
+    /// ARC frees a parent's `children` array inside the parent's own `deinit`,
+    /// so a chain thousands of levels deep unwinds recursively and overflows the
+    /// stack. Detaching bottom-up keeps every release shallow.
+    deinit {
+        guard !children.isEmpty else { return }
+        var pending = children
+        children = []
+        while let node = pending.popLast() {
+            guard !node.children.isEmpty else { continue }
+            pending.append(contentsOf: node.children)
+            node.children = []
+        }
     }
 
     public var isDirectory: Bool { kind == .directory }
@@ -83,4 +102,40 @@ public final class Node: @unchecked Sendable {
 public enum ScanError: UInt8, Codable, Sendable {
     case permissionDenied
     case ioError
+}
+
+public extension Node {
+
+    /// Builds a single chain of directories, for exercising deep-tree handling.
+    ///
+    /// Each level holds one file, and sizes are accumulated upwards the way a
+    /// real scan would leave them.
+    static func makeTestChain(depth: Int, bytesPerLevel: Int64 = 4_096) -> Node {
+        let root = Node(name: "/deep", kind: .directory)
+        var chain = [root]
+        var current = root
+        for level in 0 ..< depth {
+            let child = Node(name: "level-\(level)", kind: .directory, size: bytesPerLevel, fileCount: 1)
+            child.parent = current
+            current.children = [child]
+            chain.append(child)
+            current = child
+        }
+        for node in chain.dropLast().reversed() {
+            node.size = bytesPerLevel + (node.children.first?.size ?? 0)
+            node.fileCount = (node.children.first?.fileCount ?? 0) + 1
+        }
+        root.size -= bytesPerLevel  // The root itself holds no file.
+        root.fileCount -= 1
+        return root
+    }
+}
+
+extension Node {
+
+    /// Child count read from a snapshot before the children themselves arrive.
+    var pendingChildCount: Int {
+        get { _pendingChildCount }
+        set { _pendingChildCount = newValue }
+    }
 }
