@@ -20,6 +20,12 @@ jobs:
       - name: Test
         run: swift test
 
+      - name: Check the embedded skill matches its source
+        run: |
+          ./Scripts/embed-skill.sh
+          git diff --exit-code Sources/dscope/Generated/SkillContents.swift \
+            || { echo "Run Scripts/embed-skill.sh and commit the result"; exit 1; }
+
       - name: Check the CLI runs
         run: |
           BINARY=$(swift build -c release --show-bin-path)/dscope

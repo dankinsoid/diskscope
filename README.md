@@ -184,16 +184,50 @@ of gigabytes. Check them with `tmutil listlocalsnapshots /`.
 Some directories need Full Disk Access to read. Without it they are reported as
 unreadable rather than silently counted as empty.
 
-## Building
+## Install
+
+Homebrew:
+
+```console
+$ brew tap dankinsoid/diskscope https://github.com/dankinsoid/diskscope
+$ brew install dscope
+```
+
+[mise](https://mise.jdx.dev):
+
+```console
+$ mise use -g spm:dankinsoid/diskscope
+```
+
+Or build it yourself:
 
 ```console
 $ swift build -c release
-$ ./.build/release/dscope --help
+$ cp .build/release/dscope /usr/local/bin/
 ```
+
+`DiskKit`, the library underneath, is a Swift package in its own right:
+
+```swift
+.package(url: "https://github.com/dankinsoid/diskscope", from: "1.0.0")
+```
+
+## Teaching an assistant to use it
+
+```console
+$ dscope skill
+installed to ~/.claude/skills/diskscope/SKILL.md
+```
+
+This writes a skill describing the commands, the JSON they return, and the
+traps worth knowing — scan once and keep the snapshot, what a trailing slash
+means, why a mounted disk image must not be added to a total. Use `--to` for
+an assistant that looks elsewhere, or `--print` to read it first.
 
 ## Requirements
 
-macOS 14.0+
+macOS 14.0 or newer. Scanning `/` needs Full Disk Access to be complete —
+`dscope access` says whether it is granted.
 
 ## License
 
