@@ -52,8 +52,13 @@ struct VolumesCommand: ParsableCommand {
             let free = first.capacity - first.used
             print("\(pool)  \(first.used.formattedBytes()) used of \(first.capacity.formattedBytes()), \(free.formattedBytes()) free")
             for volume in members.sorted(by: { $0.mountPoint < $1.mountPoint }) {
-                let flag = volume.isReadOnly ? "  ro" : ""
-                print("    \(volume.mountPoint)\(flag)")
+                var flags: [String] = []
+                if volume.isReadOnly { flags.append("ro") }
+                if let backing = volume.diskImageBackingPath {
+                    flags.append("image of \((backing as NSString).lastPathComponent)")
+                }
+                let suffix = flags.isEmpty ? "" : "  (\(flags.joined(separator: ", ")))"
+                print("    \(volume.mountPoint)\(suffix)")
             }
         }
 

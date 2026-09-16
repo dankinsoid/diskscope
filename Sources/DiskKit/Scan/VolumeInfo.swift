@@ -80,6 +80,22 @@ public struct VolumeInfo: Sendable {
         return String(name[name.startIndex ..< sIndex])
     }
 
+    /// Whether this volume is a mounted disk image rather than real storage.
+    ///
+    /// An image's bytes live in a file on some other volume, so a scan that
+    /// covered that file has already counted them. Reporting the mount as extra
+    /// space counts them twice.
+    public var isDiskImage: Bool {
+        // A disk image gets a synthetic device far above the physical disks, and
+        // the kernel marks its mount as one.
+        diskImageBackingPath != nil
+    }
+
+    /// Path of the file backing this image, when it is one.
+    public var diskImageBackingPath: String? {
+        DiskImageRegistry.shared.backingPath(forDevice: device)
+    }
+
     /// Every mounted volume.
     public static func mounted() -> [VolumeInfo] {
         var pointer: UnsafeMutablePointer<statfs>?

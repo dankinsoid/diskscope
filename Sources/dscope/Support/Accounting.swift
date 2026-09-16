@@ -59,10 +59,11 @@ enum Accounting {
             guard volume.mountPoint != root else { return false }
             guard root == "/" || volume.mountPoint.hasPrefix(root + "/") else { return false }
             guard volume.storagePool != scannedPool else { return false }
-            // Read-only system images (simulator runtimes, cryptexes, mounted
-            // disk images) are reported too: they occupy space the user may not
-            // realise is mounted.
-            return volume.used >= 104_857_600
+            // A disk image's bytes are the file backing it, which the scan
+            // already counted where that file lives. Reporting the mount as
+            // extra space would count it twice.
+            guard !volume.isDiskImage else { return false }
+            return volume.used >= 1_073_741_824
         }
         guard !skipped.isEmpty else { return [] }
 
@@ -70,8 +71,9 @@ enum Accounting {
         let names = skipped.sorted { $0.used > $1.used }.prefix(3).map(\.mountPoint)
         let suffix = skipped.count > names.count ? " and \(skipped.count - names.count) more" : ""
 
+        let subject = skipped.count == 1 ? "1 other volume holds" : "\(skipped.count) other volumes hold"
         return [
-            "\(skipped.count) other volumes were not scanned, holding \(total.formattedBytes()):"
+            "\(subject) \(total.formattedBytes()), not scanned:"
                 + " \(names.joined(separator: ", "))\(suffix)",
             "scan one directly, or pass --cross-mounts to include them",
         ]
