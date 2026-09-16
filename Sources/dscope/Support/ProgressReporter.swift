@@ -87,23 +87,27 @@ final class ProgressReporter {
         let spinner = Self.spinnerFrames[frame % Self.spinnerFrames.count]
 
         // "15 GB / 494 GB" rather than a bare percentage: the denominator is an
-        // estimate, and showing it says where the number comes from. Without one
-        // the total reads "?", which is the honest answer — the size of a tree
-        // is not knowable until it has been walked.
+        // estimate, and showing it says where the number comes from. With no
+        // estimate the total is still being discovered, so it spins in place —
+        // the size of a tree is not knowable until it has been walked.
         var counts: String
         if let estimate {
             let fraction = estimate.fraction(scanned: progress.bytes)
             counts = "\(bar(fraction)) \(progress.bytes.formattedBytes()) / \(estimate.totalBytes.formattedBytes())"
         } else {
-            counts = "\(progress.bytes.formattedBytes()) / ?"
+            counts = "\(progress.bytes.formattedBytes()) / \(spinner) GB"
         }
         counts += "  \(formatted(progress.files)) files"
 
-        let path = shorten(progress.current, reserving: counts.count + 4)
+        // The leading spinner is redundant once the unknown total is spinning;
+        // with a known total the bar is what shows progress, so one marker is
+        // enough either way.
+        let lead = estimate == nil ? "" : "\(spinner) "
+        let path = shorten(progress.current, reserving: counts.count + lead.count + 4)
 
         // Dim everything: a bright full-width line reads like editable input
         // rather than a status that is about to be erased.
-        write(clearLine + dim("\(spinner) \(counts)  \(path)"))
+        write(clearLine + dim("\(lead)\(counts)  \(path)"))
     }
 
     private func bar(_ fraction: Double) -> String {
