@@ -10,8 +10,10 @@ class Dscope < Formula
   depends_on macos: :sonoma
 
   def install
-    bin.install "dscope-#{version}/dscope"
-    prefix.install "dscope-#{version}/skills"
+    # Homebrew unpacks the tarball and enters its single top-level directory,
+    # so the files are already at hand without the versioned prefix.
+    bin.install "dscope"
+    prefix.install "skills"
   end
 
   test do
