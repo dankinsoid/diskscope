@@ -89,8 +89,15 @@ final class Terminal {
     /// Draws a whole frame, replacing what was on screen.
     func draw(_ lines: [String]) {
         var output = "\u{1B}[H"  // Home, then clear each line as it is written.
-        for line in lines {
-            output += "\u{1B}[2K" + line + "\r\n"
+
+        for (index, line) in lines.enumerated() {
+            output += "\u{1B}[2K" + line
+            // No newline after the last line: writing one on the bottom row
+            // scrolls the terminal, carrying the top line — the header, and the
+            // search field with it — off the screen.
+            if index < lines.count - 1 {
+                output += "\r\n"
+            }
         }
         output += "\u{1B}[J"  // Erase anything left below a shorter frame.
         write(output)
