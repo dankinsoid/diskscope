@@ -3,7 +3,8 @@
 Find what is eating your disk space.
 
 `dscope` scans once, saves the result, and then answers questions about it
-instantly — what is large, what is stale, and what can safely go.
+instantly — what is large, what is stale, and what can safely go. Use it from a
+terminal, or hand it to a coding agent and ask in plain language.
 
 ```console
 $ dscope scan / --save ~/disk.dscope
@@ -34,6 +35,39 @@ Or from source — macOS 14 or newer:
 $ swift build -c release && cp .build/release/dscope /usr/local/bin/
 ```
 
+## Asking an assistant
+
+Much of the time the shortest route to a clean disk is to let a coding agent
+drive. One command teaches it how:
+
+```console
+$ dscope skill
+installed to ~/.claude/skills/diskscope/SKILL.md
+```
+
+Then ask in plain language:
+
+> Where has all my disk space gone? Account for all of it, and tell me what is
+> safe to delete.
+
+The skill sets the standard for that answer: scan once and keep the snapshot,
+break the disk into categories whose sizes **add up to what is in use**, name
+the remainder rather than leaving a gap, and never describe a directory it has
+not measured. What a path *means* is the assistant's judgement; every number it
+prints comes from a command it ran.
+
+It also carries the traps worth knowing — that a mounted disk image must not be
+added to a total, that summing two searches double-counts when one nests inside
+the other, that deleting to the Trash frees nothing until the Trash is emptied.
+
+Nothing is deleted without you seeing the paths first: `clean` prints a plan and
+does nothing until `--apply`, and the skill says not to pass it until you have
+agreed to the specific list.
+
+`--to` installs the skill elsewhere, `--print` writes it to stdout. Every
+command takes `--json` with stable field names, so an agent that has never seen
+the skill can still use the tool from its output alone.
+
 ## Why another one
 
 Drawing a tree of sizes is the easy part. The hard question is *"can I delete
@@ -47,8 +81,9 @@ this?"*, and that is what the tool is shaped around.
   one you are working in.
 - **Sizes you can trust.** They agree with `du` exactly, and the tool accounts
   for the space no directory tree contains rather than leaving it unexplained.
-- **Scriptable.** Every command takes `--json`, so scripts and coding agents
-  reach everything the interactive browser does.
+- **Built for agents as much as for people.** Every command takes `--json` with
+  stable fields, an installable skill teaches an assistant the tool and its
+  traps, and nothing is deleted without a plan you have seen.
 
 ## Browsing
 
@@ -190,18 +225,6 @@ and compressed files report what they actually occupy. Hard links count once.
 Directories reachable by two paths count once, which is what makes a scan of `/`
 correct: macOS firmlinks `/System/Volumes/Data` onto `/`, and walking both
 reported 759 GB on a disk holding 385 GB.
-
-## Teaching an assistant to use it
-
-```console
-$ dscope skill
-installed to ~/.claude/skills/diskscope/SKILL.md
-```
-
-This writes a skill describing the commands, the JSON they return, and the traps
-worth knowing — scan once and keep the snapshot, what a trailing slash means,
-why a mounted disk image must not be added to a total. `--to` installs
-elsewhere, `--print` writes it to stdout.
 
 ## Using it as a library
 
