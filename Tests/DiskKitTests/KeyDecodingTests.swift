@@ -69,3 +69,42 @@ struct KeyDecodingTests {
         #expect(decode("a—б") == ["a", "—", "б"])
     }
 }
+
+/// Escape is both a key and the first byte of every arrow key and mouse report.
+@Suite("Escape sequences")
+struct EscapeSequenceTests {
+
+    /// Bytes a terminal sends for the keys the browser understands.
+    @Test("arrow keys and mouse reports begin with the same byte as Escape")
+    func sequencesShareTheirFirstByte() {
+        let escape: [UInt8] = [0x1B]
+        let arrowDown: [UInt8] = Array("\u{1B}[B".utf8)
+        let wheelDown: [UInt8] = Array("\u{1B}[<65;20;10M".utf8)
+
+        #expect(escape.first == arrowDown.first)
+        #expect(escape.first == wheelDown.first)
+
+        // Nothing in the stream says which one it is, so telling them apart
+        // means waiting briefly and seeing whether more arrives.
+        #expect(escape.count == 1)
+        #expect(arrowDown.count > 1)
+    }
+
+    @Test("a mouse report ends at its final letter")
+    func mouseReportIsSelfDelimiting() {
+        let report = Array("\u{1B}[<65;20;10M".utf8)
+
+        // Everything up to M or m belongs to the report; leaving the rest in
+        // the stream turns one scroll into a burst of stray keys.
+        #expect(report.last == UInt8(ascii: "M"))
+        #expect(report.dropLast().allSatisfy { $0 != UInt8(ascii: "M") })
+    }
+
+    @Test("a CSI sequence ends in the range 0x40...0x7E", arguments: [
+        "\u{1B}[A", "\u{1B}[B", "\u{1B}[5~", "\u{1B}[<65;20;10M", "\u{1B}[200~",
+    ])
+    func sequencesEndInTheFinalByteRange(_ sequence: String) {
+        let final = Array(sequence.utf8).last!
+        #expect((0x40 ... 0x7E).contains(final))
+    }
+}

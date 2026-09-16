@@ -99,8 +99,13 @@ final class Terminal {
     /// Whether more input is already waiting, so a burst can be drained before
     /// redrawing. Typing arrives faster than a search over a large tree can run.
     func hasPendingInput() -> Bool {
+        waitForInput(timeout: 0)
+    }
+
+    /// Waits up to `timeout` seconds for a byte to become readable.
+    private func waitForInput(timeout: TimeInterval) -> Bool {
         var descriptor = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
-        return poll(&descriptor, 1, 0) > 0
+        return poll(&descriptor, 1, Int32(timeout * 1000)) > 0
     }
 
     /// A byte read while completing a sequence that turned out to start the
@@ -173,8 +178,14 @@ final class Terminal {
 
     /// Arrow keys and friends arrive as escape sequences.
     private func readEscapeSequence() -> Key {
+        // Escape is both a key and the start of every arrow and mouse report,
+        // and nothing in the byte stream distinguishes them. A terminal sends
+        // the rest of a sequence immediately, so a brief silence means the key
+        // was pressed alone — without this wait, a lone Escape blocks until the
+        // next keystroke arrives and then steals it.
+        guard waitForInput(timeout: 0.03) else { return .escape }
+
         var next: UInt8 = 0
-        // A lone Escape is a key in its own right; anything else is a sequence.
         guard read(STDIN_FILENO, &next, 1) == 1 else { return .escape }
         guard next == 0x5B else {
             // ESC O introduces the arrow keys some terminals send in
