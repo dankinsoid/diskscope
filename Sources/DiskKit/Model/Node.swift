@@ -64,10 +64,14 @@ public final class Node: @unchecked Sendable {
     /// stack. Detaching bottom-up keeps every release shallow.
     deinit {
         guard !children.isEmpty else { return }
+
         var pending = children
         children = []
-        while let node = pending.popLast() {
-            guard !node.children.isEmpty else { continue }
+        while var node = pending.popLast() {
+            // Only take apart a node about to be freed anyway. A node someone
+            // else still holds — a subtree re-rooted into its own snapshot —
+            // must keep its children.
+            guard isKnownUniquelyReferenced(&node), !node.children.isEmpty else { continue }
             pending.append(contentsOf: node.children)
             node.children = []
         }

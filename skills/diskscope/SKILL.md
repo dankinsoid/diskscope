@@ -37,8 +37,25 @@ Re-scan only when the user has deleted things and wants updated numbers.
 | Find by name | `dscope search <query> <path> --mode glob --json` |
 | Plan a cleanup | `dscope clean <query> <path> --except <keep> --json` |
 
-Useful options: `--mode substring|glob|regex`, `--min 500MB`, `--limit`,
-`--sort size|name|files|modified|accessed`, `--files-only`.
+Options differ per command — these are not interchangeable:
+
+| Command | Options |
+|---|---|
+| `scan` | `--depth`, `--min`, `--save`, `--under` |
+| `search` | `--mode`, `--min`, `--limit`, `--sort`, `--full-path`, `--include-nested`, `--under` |
+| `top` | `--count`, `--files-only`, `--stale-days`, `--under` |
+| `clean` | `--mode`, `--min`, `--except`, `--apply`, `--yes`, `--permanent` |
+
+`--under <path>` re-roots a snapshot on a subtree, which is how you look inside
+one directory without rescanning or printing the whole disk:
+
+```bash
+dscope scan /tmp/disk.dscope --under ~/Library/Developer --depth 2 --json
+```
+
+For directory names prefer `--mode glob` with an exact pattern: a substring
+search for `.build` also matches `*.build` inside DerivedData, which can differ
+by many gigabytes.
 
 ## Deleting
 
@@ -63,6 +80,10 @@ dscope clean '.build' ~/Code --mode glob --min 500MB --except project-a --apply 
 several. Deletion moves items to the Trash, so it is recoverable — do not pass
 `--permanent` unless the user explicitly asks for it.
 
+`clean` always works against the live filesystem, never a snapshot: a saved scan
+may be hours old, and deleting from stale paths is how the wrong thing goes. Its
+sizes can therefore differ slightly from a snapshot's.
+
 ## Reading the results
 
 - `bytes` is allocated size, matching `du`. `humanSize` is the same number
@@ -71,6 +92,11 @@ several. Deletion moves items to the Trash, so it is recoverable — do not pass
   outermost copy, so summing `bytes` never double-counts.
 - `truncated: true` means `--limit` cut results off; raise it before concluding
   you have seen everything.
+- `scan` returns the tree under `tree`; `root` is the path that was scanned, not
+  the tree itself. `search` and `top` return `matches`.
+- `top` reports places where space accumulates, never an entry inside another
+  one, so its sizes can be summed. It deliberately omits directories that merely
+  pass their size to a single child.
 - `unreadablePaths` lists directories that could not be read. Those sizes are
   lower bounds — mention this rather than presenting the total as exact.
 

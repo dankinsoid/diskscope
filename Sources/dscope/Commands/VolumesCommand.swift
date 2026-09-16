@@ -64,11 +64,15 @@ struct VolumesCommand: ParsableCommand {
 
         if !snapshots.isEmpty {
             print("")
-            print("\(snapshots.count) local APFS snapshots — these hold space that no directory tree shows:")
+            let held = LocalSnapshots.purgeableBytes().map { " holding \($0.formattedBytes())" } ?? ""
+            print("\(snapshots.count) local APFS snapshots\(held) — space no directory tree shows:")
             for snapshot in snapshots.prefix(10) {
                 print("  \(snapshot)")
             }
-            print("Remove with: tmutil deletelocalsnapshots <name>")
+            // Snapshots share blocks, so only the system can say what deleting
+            // one would actually release.
+            print("Delete with: tmutil deletelocalsnapshots <name>")
+            print("Check what they hold: tmutil listlocalsnapshots / and About This Mac > Storage")
         }
     }
 }

@@ -88,18 +88,24 @@ public struct ScanReportJSON: Codable, Sendable {
     public let totalBytes: Int64
     public let humanSize: String
     public let totalFiles: Int
+    public let unreadableCount: Int
+
+    /// A sample rather than the whole list: a disk scan hits hundreds of these,
+    /// and printing them all buries the fields a caller actually reads.
     public let unreadablePaths: [String]
     public let accounting: AccountingJSON?
     public let tree: NodeJSON?
 
-    public init(snapshot: Snapshot, tree: NodeJSON?) {
+    public init(snapshot: Snapshot, tree: NodeJSON?, unreadableSampleSize: Int = 10) {
         self.root = snapshot.rootPath
         self.scannedAt = snapshot.scannedAt
         self.durationSeconds = snapshot.duration
         self.totalBytes = snapshot.totalSize
         self.humanSize = snapshot.totalSize.formattedBytes()
         self.totalFiles = snapshot.fileCount
-        self.unreadablePaths = snapshot.unreadablePaths
+        let unreadable = snapshot.unreadablePaths
+        self.unreadableCount = unreadable.count
+        self.unreadablePaths = Array(unreadable.prefix(unreadableSampleSize))
         self.accounting = snapshot.accounting.map(AccountingJSON.init)
         self.tree = tree
     }

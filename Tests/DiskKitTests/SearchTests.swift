@@ -75,14 +75,48 @@ struct SearchTests {
         #expect(recent.isEmpty)
     }
 
-    @Test("largest lists the biggest entries below the root")
-    func listsLargest() {
+    @Test("largest never lists an entry inside another")
+    func listsLargestWithoutNesting() {
         let snapshot = makeTree()
-        let largest = snapshot.largest(3)
+        let largest = snapshot.largest(5)
 
-        #expect(largest.map(\.name) == ["app", "node_modules", "node_modules"])
-        #expect(largest.map(\.size) == [5_000, 4_000, 1_500])
+        // /work/app holds almost everything and would otherwise head the list,
+        // followed by the copies of itself on the way down.
+        for (index, node) in largest.enumerated() {
+            for other in largest[..<index] {
+                #expect(!node.isDescendant(of: other), "\(node.path) is inside \(other.path)")
+            }
+        }
+
+        // Summing the result must never exceed what was scanned.
+        #expect(largest.reduce(Int64(0)) { $0 + $1.size } <= snapshot.totalSize)
         #expect(snapshot.largest(2, kinds: [.file]).map(\.name) == ["README.md"])
+    }
+
+    @Test("largest skips a directory that is merely a wrapper for one child")
+    func skipsPassThroughDirectories() {
+        let root = Node(name: "/disk", kind: .directory)
+        let wrapper = Node(name: "wrapper", kind: .directory, size: 10_000, fileCount: 1)
+        let payload = Node(name: "payload.bin", kind: .file, size: 9_900, fileCount: 1)
+        let spread = Node(name: "spread", kind: .directory, size: 8_000, fileCount: 2)
+        let halfA = Node(name: "a.bin", kind: .file, size: 4_000, fileCount: 1)
+        let halfB = Node(name: "b.bin", kind: .file, size: 4_000, fileCount: 1)
+
+        payload.parent = wrapper
+        wrapper.children = [payload]
+        for half in [halfA, halfB] { half.parent = spread }
+        spread.children = [halfA, halfB]
+        for child in [wrapper, spread] { child.parent = root }
+        root.children = [wrapper, spread]
+        root.size = 18_000
+
+        let largest = Snapshot(root: root, rootPath: "/disk").largest(4)
+
+        // 'wrapper' only passes its size down to one file, so the file is the
+        // useful answer; 'spread' genuinely accumulates and is reported itself.
+        #expect(largest.contains { $0 === payload })
+        #expect(largest.contains { $0 === spread })
+        #expect(!largest.contains { $0 === wrapper })
     }
 
     @Test("an empty filter matches nothing rather than everything")

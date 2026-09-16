@@ -29,7 +29,7 @@ struct SearchCommand: ParsableCommand {
     @Flag(name: .long, help: "Include matches nested inside other matches.")
     var includeNested = false
 
-    @Option(name: .shortAndLong, help: "Ignore matches smaller than this, e.g. 100MB.")
+    @Option(name: .long, help: "Ignore matches smaller than this, e.g. 100MB.")
     var min = "0"
 
     @Option(name: .shortAndLong, help: "Stop after this many matches.")

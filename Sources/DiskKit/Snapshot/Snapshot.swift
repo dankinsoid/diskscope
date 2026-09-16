@@ -82,9 +82,17 @@ public extension Node {
     /// The node at `path`, or nil when the path is outside this tree.
     func node(atPath path: String) -> Node? {
         let rootPath = self.path
-        guard path == rootPath || path.hasPrefix(rootPath + "/") else { return nil }
+        guard path == rootPath else {
+            // The filesystem root already ends in a separator, so appending one
+            // would look for "//Users".
+            let prefix = rootPath == "/" ? "/" : rootPath + "/"
+            guard path.hasPrefix(prefix) else { return nil }
+            return descend(String(path.dropFirst(rootPath.count)))
+        }
+        return self
+    }
 
-        let relative = String(path.dropFirst(rootPath.count))
+    private func descend(_ relative: String) -> Node? {
         var node = self
         for component in relative.split(separator: "/") {
             guard let next = node.children.first(where: { $0.name == component }) else { return nil }
@@ -102,5 +110,18 @@ public extension Node {
             node = current.parent
         }
         return chain.reversed()
+    }
+}
+
+public extension Node {
+
+    /// Whether this node lies inside `other`.
+    func isDescendant(of other: Node) -> Bool {
+        var node = parent
+        while let current = node {
+            if current === other { return true }
+            node = current.parent
+        }
+        return false
     }
 }

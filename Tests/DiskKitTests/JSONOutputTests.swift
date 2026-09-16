@@ -62,6 +62,6 @@ struct JSONOutputTests {
 
         #expect(report.matchCount == 1)
         #expect(report.truncated)
-        #expect(report.totalBytes == 2_000)
+        #expect(report.totalBytes == matches[0].size)
     }
 }

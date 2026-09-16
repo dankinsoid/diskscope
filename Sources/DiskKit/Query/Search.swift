@@ -58,14 +58,49 @@ public extension Snapshot {
         return matches
     }
 
-    /// The largest entries anywhere in the tree.
+    /// The largest entries worth looking at, none inside another.
+    ///
+    /// Plain "largest nodes" is useless: the answer is always the chain of
+    /// ancestors — `/Users`, then `/Users/you`, then `/Users/you/Library` —
+    /// each containing the next, with sizes that sum to several times the disk.
+    ///
+    /// An entry earns a place only when it is not merely a container for one
+    /// big child, so the result is the places where space actually accumulates.
     func largest(_ count: Int, kinds: Set<Node.Kind>? = nil) -> [Node] {
-        var nodes: [Node] = []
+        // A single entry holding most of the tree is a signpost, not an answer:
+        // reporting /Users only restates that the disk belongs to somebody.
+        let ceiling = Int64(Double(root.size) * 0.5)
+
+        var candidates: [Node] = []
         root.walk { node in
             guard node !== root else { return }
             if let kinds, !kinds.contains(node.kind) { return }
-            nodes.append(node)
+            // A file is an answer whatever its size; only a directory can be a
+            // signpost that merely restates where everything lives.
+            guard !node.isDirectory || node.size <= ceiling else { return }
+            guard accumulatesSpace(node) else { return }
+            candidates.append(node)
         }
-        return Array(nodes.sorted { $0.size > $1.size }.prefix(count))
+        candidates.sort { $0.size > $1.size }
+
+        var chosen: [Node] = []
+        for node in candidates {
+            guard chosen.count < count else { break }
+            // Largest first, so an ancestor is always considered before its
+            // children; anything under one already chosen would double-count it.
+            if chosen.contains(where: { node.isDescendant(of: $0) }) { continue }
+            chosen.append(node)
+        }
+        return chosen
+    }
+
+    /// Whether a node holds space in its own right rather than passing it down.
+    ///
+    /// A directory whose size is almost entirely one child is a waypoint on the
+    /// way to that child, and reporting it just buries the real answer.
+    private func accumulatesSpace(_ node: Node) -> Bool {
+        guard node.isDirectory else { return true }
+        guard let largestChild = node.children.max(by: { $0.size < $1.size }) else { return true }
+        return Double(largestChild.size) < Double(node.size) * 0.8
     }
 }

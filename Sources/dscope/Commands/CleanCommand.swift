@@ -29,7 +29,7 @@ struct CleanCommand: ParsableCommand {
     @Option(name: .long, parsing: .upToNextOption, help: "Keep matches whose path contains any of these.")
     var except: [String] = []
 
-    @Option(name: .shortAndLong, help: "Ignore matches smaller than this.")
+    @Option(name: .long, help: "Ignore matches smaller than this.")
     var min = "0"
 
     @Flag(name: .long, help: "Actually delete. Without this, nothing is touched.")

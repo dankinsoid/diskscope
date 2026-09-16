@@ -11,6 +11,9 @@ struct SourceOptions: ParsableArguments {
     @Flag(name: .long, help: "Cross mount points, counting other volumes too.")
     var crossMounts = false
 
+    @Option(name: .long, help: "Limit a snapshot to this subtree, e.g. --under ~/Library.")
+    var under: String?
+
     func load(quiet: Bool = false) throws -> Snapshot {
         let url = URL(fileURLWithPath: path)
 
@@ -20,7 +23,8 @@ struct SourceOptions: ParsableArguments {
         }
 
         if !isDirectory.boolValue {
-            return try SnapshotFile.read(from: url)
+            let snapshot = try SnapshotFile.read(from: url)
+            return try narrow(snapshot)
         }
 
         let scanner = DiskScanner(options: ScanOptions(crossMountPoints: crossMounts))
@@ -35,12 +39,35 @@ struct SourceOptions: ParsableArguments {
         if !quiet {
             Output.note("scanned \(root.fileCount) files in \(String(format: "%.1fs", duration))")
         }
+        return try narrow(
+            Snapshot(
+                root: root,
+                rootPath: path,
+                options: scanner.options,
+                duration: duration,
+                volume: VolumeInfo(path: path)
+            )
+        )
+    }
+
+    /// Restricts a snapshot to the subtree named by `--under`.
+    ///
+    /// Re-rooting a saved scan is the whole point of saving it: looking inside
+    /// one directory should not mean printing the entire disk and filtering.
+    private func narrow(_ snapshot: Snapshot) throws -> Snapshot {
+        guard let under else { return snapshot }
+
+        let target = (NSString(string: under).expandingTildeInPath as NSString).standardizingPath
+        guard let node = snapshot.root.node(atPath: target) else {
+            throw ValidationError("'\(target)' is not inside \(snapshot.rootPath)")
+        }
         return Snapshot(
-            root: root,
-            rootPath: path,
-            options: scanner.options,
-            duration: duration,
-            volume: VolumeInfo(path: path)
+            root: node,
+            rootPath: target,
+            scannedAt: snapshot.scannedAt,
+            options: snapshot.options,
+            duration: snapshot.duration,
+            volume: snapshot.volume
         )
     }
 }
