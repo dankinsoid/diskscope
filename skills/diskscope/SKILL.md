@@ -192,6 +192,16 @@ When `coversWholeVolume` is true and `unaccountedBytes` is large, run
 
 Scanning `/` takes a few minutes and needs Full Disk Access to be complete.
 
+`/` is one volume, not the whole machine: an external disk mounted under
+`/Volumes` is never reached from it. `--all-volumes` scans each mounted volume
+and gathers them under one root, skipping disk images — whose bytes are the file
+backing them, already counted — and representing volumes that share a storage
+pool once.
+
+```bash
+dscope scan --all-volumes --save /tmp/dscope-session.dscope --json > /dev/null
+```
+
 ## Judging what is safe
 
 `dscope` reports facts, not verdicts. Regenerable things — `.build`,

@@ -37,7 +37,11 @@ public enum AllVolumes {
         scanner: (String) -> Node
     ) -> Node {
         let volumes = scannable()
-        let root = Node(name: "", kind: .directory)
+
+        // Named for what it is, since it appears at the top of the tree, and
+        // marked so the absolute paths below it are left alone.
+        let root = Node(name: "all volumes", kind: .directory)
+        root.isSyntheticRoot = true
 
         var children: [Node] = []
         for volume in volumes {

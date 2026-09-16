@@ -37,6 +37,13 @@ public final class Node: @unchecked Sendable {
     /// Scratch space used while a snapshot is being rebuilt.
     var _pendingChildCount: Int = 0
 
+    /// Whether this node stands above the filesystem rather than in it.
+    ///
+    /// The root of an all-volumes scan holds several volumes together; it has a
+    /// name to show, but contributes nothing to the paths beneath it, which are
+    /// already absolute.
+    public internal(set) var isSyntheticRoot = false
+
     init(
         name: String,
         kind: Kind,
@@ -82,6 +89,9 @@ public final class Node: @unchecked Sendable {
     /// Absolute path, rebuilt by walking up to the root.
     public var path: String {
         guard let parent else { return name }
+
+        if parent.isSyntheticRoot { return name }
+
         let prefix = parent.path
         return prefix == "/" ? "/" + name : prefix + "/" + name
     }

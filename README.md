@@ -135,6 +135,19 @@ $ dscope search node_modules ~/home.dscope --json --limit 1
 Nested matches are skipped by default: searching for `node_modules` reports the
 outermost copy, never the same bytes twice.
 
+### Every disk, not just the boot volume
+
+`/` is one volume. An external disk, or anything else mounted elsewhere, is
+never reached by walking it:
+
+```console
+$ dscope scan --all-volumes --depth 1
+```
+
+Each mounted volume is scanned and gathered under one root. Disk images are
+skipped — their bytes are the file backing them, which the scan already counted
+— and volumes sharing a storage pool are represented once.
+
 ### Space no directory tree contains
 
 A tree walk cannot find everything that fills a disk. `dscope volumes` shows
