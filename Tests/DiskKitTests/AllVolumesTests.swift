@@ -89,3 +89,18 @@ extension AllVolumesTests {
         #expect(AllVolumes.scannable().allSatisfy { $0.used >= 64 * 1_048_576 })
     }
 }
+
+extension AllVolumesTests {
+
+    @Test("a bind-mounted bundle is not treated as a disk")
+    func skipsBindMounts() {
+        // An application mounting part of itself reports a path where a device
+        // belongs; counting it would add bytes the filesystem already holds.
+        #expect(AllVolumes.scannable().allSatisfy { $0.device.hasPrefix("/dev/") })
+    }
+
+    @Test("the volume holding the root is always scannable")
+    func includesRoot() {
+        #expect(AllVolumes.scannable().contains { $0.mountPoint == "/" })
+    }
+}

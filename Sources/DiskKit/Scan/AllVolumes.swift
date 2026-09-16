@@ -18,6 +18,11 @@ public enum AllVolumes {
             guard !volume.isDiskImage else { continue }
             guard !isPseudoFilesystem(volume) else { continue }
 
+            // Real storage is mounted from a device. An application bundle
+            // bind-mounting part of itself is not a disk, and reporting it as
+            // one counts its bytes a second time.
+            guard volume.device.hasPrefix("/dev/") else { continue }
+
             // Below this a volume is bookkeeping rather than storage, and
             // scanning it costs more than it can ever report.
             guard volume.used >= 64 * 1_048_576 else { continue }

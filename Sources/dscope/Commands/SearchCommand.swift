@@ -81,10 +81,11 @@ struct SearchCommand: ParsableCommand {
         )
         let snapshot = try source.load(quiet: format.json)
 
-        // One extra result reveals whether the limit cut anything off.
+        // Everything matching, so a truncated listing can still report the full
+        // size of the category it describes.
         let found = includeNested
-            ? snapshot.search(conditions, limit: limit + 1, sortedBy: sort)
-            : snapshot.searchTopmost(conditions, limit: limit + 1, sortedBy: sort)
+            ? snapshot.search(conditions, sortedBy: sort)
+            : snapshot.searchTopmost(conditions, sortedBy: sort)
 
         let truncated = found.count > limit
         let matches = truncated ? Array(found.prefix(limit)) : found
@@ -95,7 +96,8 @@ struct SearchCommand: ParsableCommand {
                     query: filter.name ?? pattern ?? "",
                     mode: filter.mode,
                     matches: matches,
-                    truncated: truncated
+                    truncated: truncated,
+                    allMatches: found
                 ),
                 pretty: format.pretty
             )
@@ -109,8 +111,15 @@ struct SearchCommand: ParsableCommand {
         for node in matches {
             print("\(node.size.formattedBytes())\t\(node.path)")
         }
-        let total = matches.reduce(Int64(0)) { $0 + $1.size }
-        Output.note("\(matches.count) matches, \(total.formattedBytes()) total\(truncated ? " (limited)" : "")")
+        let total = found.reduce(Int64(0)) { $0 + $1.size }
+        if truncated {
+            Output.note(
+                "showing \(matches.count) of \(found.count) matches;"
+                    + " \(total.formattedBytes()) in total"
+            )
+        } else {
+            Output.note("\(matches.count) matches, \(total.formattedBytes()) total")
+        }
     }
 }
 

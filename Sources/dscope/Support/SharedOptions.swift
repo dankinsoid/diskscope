@@ -114,6 +114,13 @@ struct SourceOptions: ParsableArguments {
         )
     }
 
+    /// Resolves every symlink in a path, including the ones Foundation keeps.
+    private func realPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
     /// Scans every mounted volume and gathers them under one root.
     private func scanEveryVolume(quiet: Bool, summary: Bool) throws -> Snapshot {
         let options = ScanOptions(crossMountPoints: crossMounts)
@@ -159,10 +166,33 @@ struct SourceOptions: ParsableArguments {
     private func narrow(_ snapshot: Snapshot) throws -> Snapshot {
         guard let under else { return snapshot }
 
-        let target = (NSString(string: under).expandingTildeInPath as NSString).standardizingPath
-        guard let node = snapshot.root.node(atPath: target) else {
-            throw ValidationError("'\(target)' is not inside \(snapshot.rootPath)")
+        // standardizingPath rewrites /private/var to /var, which is a symlink
+        // in the tree: narrowing to it reports zero bytes for a directory
+        // holding tens of gigabytes. Try the path as written first, and refuse
+        // a symlink rather than answering from one.
+        let expanded = NSString(string: under).expandingTildeInPath
+        let candidates = [expanded, (expanded as NSString).standardizingPath, realPath(expanded)]
+
+        var found: Node?
+        var target = expanded
+        for candidate in candidates {
+            guard let node = snapshot.root.node(atPath: candidate) else { continue }
+            if node.kind == .symlink { continue }
+            found = node
+            target = candidate
+            break
         }
+
+        guard let node = found else {
+            let symlinked = candidates.compactMap { snapshot.root.node(atPath: $0) }
+                .contains { $0.kind == .symlink }
+            throw ValidationError(
+                symlinked
+                    ? "'\(expanded)' is a symlink in this scan; use the path it points at"
+                    : "'\(expanded)' is not inside \(snapshot.rootPath)"
+            )
+        }
+
         return Snapshot(
             root: node,
             rootPath: target,

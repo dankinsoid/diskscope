@@ -65,3 +65,40 @@ struct JSONOutputTests {
         #expect(report.totalBytes == matches[0].size)
     }
 }
+
+extension JSONOutputTests {
+
+    @Test("a truncated search still reports the size of everything it matched")
+    func reportsFullSizeWhenTruncated() {
+        let root = Node(name: "/work", kind: .directory)
+        var all: [Node] = []
+        for index in 0 ..< 10 {
+            let child = Node(name: "cache-\(index)", kind: .directory, size: 100, fileCount: 1)
+            child.parent = root
+            all.append(child)
+        }
+        root.children = all
+        root.size = 1_000
+
+        let listed = Array(all.prefix(3))
+        let report = SearchReportJSON(
+            query: "cache", mode: .substring, matches: listed, truncated: true, allMatches: all
+        )
+
+        // Summing what was printed would understate the category threefold,
+        // which is exactly how a cleanup plan ends up wrong.
+        #expect(report.matchCount == 3)
+        #expect(report.totalMatchCount == 10)
+        #expect(report.listedBytes == 300)
+        #expect(report.totalBytes == 1_000)
+    }
+
+    @Test("an untruncated search reports the same figure both ways")
+    func reportsOneFigureWhenComplete() {
+        let node = Node(name: "only", kind: .file, size: 500, fileCount: 1)
+        let report = SearchReportJSON(query: "only", mode: .substring, matches: [node], truncated: false)
+
+        #expect(report.totalBytes == report.listedBytes)
+        #expect(report.matchCount == report.totalMatchCount)
+    }
+}

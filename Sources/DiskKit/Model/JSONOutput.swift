@@ -114,18 +114,36 @@ public struct ScanReportJSON: Codable, Sendable {
 public struct SearchReportJSON: Codable, Sendable {
     public let query: String
     public let mode: String
+
+    /// Matches listed, which `--limit` may have cut short.
     public let matchCount: Int
+
+    /// Matches found, whatever the limit.
+    public let totalMatchCount: Int
+
+    /// Size of every match, not only the listed ones.
+    ///
+    /// A truncated listing that reported only what it printed would understate
+    /// a category by however much was cut — for one query here, threefold.
     public let totalBytes: Int64
     public let humanSize: String
+
+    /// Size of the matches actually listed.
+    public let listedBytes: Int64
+
     public let truncated: Bool
     public let matches: [NodeJSON]
 
-    public init(query: String, mode: MatchMode, matches: [Node], truncated: Bool) {
+    public init(query: String, mode: MatchMode, matches: [Node], truncated: Bool, allMatches: [Node]? = nil) {
+        let everything = allMatches ?? matches
+
         self.query = query
         self.mode = mode.rawValue
         self.matchCount = matches.count
-        self.totalBytes = matches.reduce(0) { $0 + $1.size }
+        self.totalMatchCount = everything.count
+        self.totalBytes = everything.reduce(0) { $0 + $1.size }
         self.humanSize = self.totalBytes.formattedBytes()
+        self.listedBytes = matches.reduce(0) { $0 + $1.size }
         self.truncated = truncated
         self.matches = matches.map { NodeJSON($0, includeShare: false) }
     }

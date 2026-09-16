@@ -188,7 +188,13 @@ what is freed.
   formatted.
 - Nested matches are omitted by default, so summing `bytes` never double-counts.
   `--include-nested` turns that off, and then sums are meaningless.
-- `truncated: true` means `--limit` cut the results off.
+- `truncated: true` means `--limit` cut the listing short. `totalBytes` and
+  `totalMatchCount` still describe every match, so a category's size is correct
+  whether or not the listing was cut; `listedBytes` is what was printed.
+- Summing `totalBytes` across several queries **does** double-count, even though
+  each one is free of nesting on its own: `build` sits inside `DerivedData`, so
+  a naive total over both is wrong. Discard any match whose path starts with
+  another match's path before adding them up.
 - `scan` returns the tree under `tree`; `root` is the path scanned, not the
   tree. `search` and `top` return `matches`.
 - `top` reports where space accumulates, never an entry inside another, so its
