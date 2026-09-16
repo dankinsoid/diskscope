@@ -34,7 +34,8 @@ public enum IncrementalScan {
     public static func update(
         _ snapshot: Snapshot,
         options: ScanOptions = ScanOptions(),
-        journalLimit: Int = 20_000
+        journalLimit: Int = 20_000,
+        report: ((String) -> Void)? = nil
     ) -> Result {
         let root = snapshot.rootPath
         let outcome = ChangeJournal.changes(
@@ -66,6 +67,7 @@ public enum IncrementalScan {
         for path in targets {
             guard let node = snapshot.root.node(atPath: path) ?? nearestExisting(path, in: snapshot.root)
             else { continue }
+            report?("\(node.path) (\(node.size.formattedBytes()))")
             guard replace(node, using: scanner, in: snapshot.root) else { continue }
             rescanned += 1
         }

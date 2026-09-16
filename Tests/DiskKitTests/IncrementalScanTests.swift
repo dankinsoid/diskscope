@@ -153,3 +153,38 @@ struct IncrementalScanTests {
         #expect(IncrementalScan.topmost(paths) == ["/work/other", "/work/project"])
     }
 }
+
+extension IncrementalScanTests {
+
+    @Test("a build directory and everything under it collapse to one rescan")
+    func collapsesDeeplyNestedChanges() {
+        // What a build actually produces: the directory plus every object
+        // directory inside it, each reported separately by the journal.
+        var paths: Set<String> = ["/work/app/.build"]
+        for module in ["Core", "UI", "Tests"] {
+            paths.insert("/work/app/.build/debug/\(module).build")
+            for object in 0 ..< 3 {
+                paths.insert("/work/app/.build/debug/\(module).build/object-\(object)")
+            }
+        }
+        paths.insert("/work/other")
+
+        let collapsed = IncrementalScan.topmost(paths)
+
+        // Rescanning the outermost directory covers all of it; doing each one
+        // separately re-walks the same files a dozen times over.
+        #expect(collapsed == ["/work/app/.build", "/work/other"])
+    }
+
+    @Test("paths reported with a trailing separator still collapse")
+    func collapsesPathsWithTrailingSlash() {
+        // FSEvents reports directories as "/path/to/dir/", and a prefix test
+        // that ignores that treats every nested path as unrelated.
+        let paths: Set<String> = [
+            "/work/app/.build",
+            "/work/app/.build/debug",
+            "/work/app/.build/debug/Core.build",
+        ]
+        #expect(IncrementalScan.topmost(paths) == ["/work/app/.build"])
+    }
+}

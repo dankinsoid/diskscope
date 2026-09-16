@@ -23,12 +23,19 @@ struct UpdateCommand: ParsableCommand {
     @Option(name: .long, help: "Write the result here instead of overwriting.")
     var output: String?
 
+    @Flag(name: .long, help: "List the directories that were re-measured.")
+    var verbose = false
+
     func run() throws {
         let url = URL(fileURLWithPath: path)
         let snapshot = try SnapshotFile.read(from: url)
 
         let started = Date()
-        let result = IncrementalScan.update(snapshot, options: snapshot.options)
+        let result = IncrementalScan.update(
+            snapshot,
+            options: snapshot.options,
+            report: verbose ? { Output.note("  rescan \($0)") } : nil
+        )
         let elapsed = Date().timeIntervalSince(started)
 
         let destination = output.map { URL(fileURLWithPath: $0) } ?? url
