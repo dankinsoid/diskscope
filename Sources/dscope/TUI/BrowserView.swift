@@ -23,24 +23,25 @@ enum BrowserView {
 
     private static func header(_ state: BrowserState, width: Int) -> String {
         if let search = state.search {
-            let label = search.mode == .regex ? "regex" : "search"
-            let typed = truncate(search.query, to: max(8, width - 40))
+            // Drawn as a filled bar: the rest of the screen is dim text, and a
+            // dim line of the same shape does not read as somewhere to type.
+            let label = search.mode == .regex ? " regex " : " search "
+            let typed = truncate(search.query, to: max(8, width - 44))
+            let caret = search.isEditing ? "▏" : ""
 
-            // An empty query has not been answered yet; saying "0 matches"
-            // reads as a result and makes the box look broken.
-            let note: String
+            let hint: String
             if let error = search.error {
-                note = Style.dim("  \(error)")
+                hint = error
             } else if search.query.isEmpty {
-                note = Style.dim("  type to search, esc to cancel")
+                hint = "type to search · esc cancels"
             } else {
-                note = Style.dim("  \(state.rows.count) matches")
+                hint = "\(state.rows.count) matches · enter keeps them · esc cancels"
             }
 
-            // The caret stays bright while the field has focus: everything else
-            // on screen is dim, so a dim caret does not read as an input.
-            let caret = search.isEditing ? Style.inverted(" ") : ""
-            return Style.bold("\(label): ") + typed + caret + note
+            let entry = Style.inverted(label) + " " + typed + caret
+            let plainWidth = label.count + 1 + typed.count + caret.count
+            let padding = max(1, width - plainWidth - hint.count - 1)
+            return entry + String(repeating: " ", count: padding) + Style.dim(hint)
         }
 
         let path = truncate(state.current.path, to: width - 24)

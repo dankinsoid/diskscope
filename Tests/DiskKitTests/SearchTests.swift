@@ -169,3 +169,43 @@ extension SearchTests {
         return Snapshot(root: root, rootPath: "/case")
     }
 }
+
+extension SearchTests {
+
+    @Test("a non-ASCII query is answered as quickly as an ASCII one")
+    func nonASCIIQueryIsFast() throws {
+        // Typing is per-keystroke: a query that takes seconds makes the search
+        // box look frozen. Cyrillic used to take twelve seconds where the same
+        // search in Latin took under one.
+        let root = Node(name: "/big", kind: .directory)
+        var children: [Node] = []
+        for index in 0 ..< 20_000 {
+            let child = Node(name: "entry-\(index)-копия", kind: .file, size: 10, fileCount: 1)
+            child.parent = root
+            children.append(child)
+        }
+        root.children = children
+        root.size = 200_000
+        let snapshot = Snapshot(root: root, rootPath: "/big")
+
+        let started = Date()
+        let matches = snapshot.search(Filter(pattern: try Pattern("копия")), limit: 50)
+        let elapsed = Date().timeIntervalSince(started)
+
+        #expect(matches.count == 50)
+        #expect(elapsed < 1, "took \(elapsed)s")
+    }
+
+    @Test("case folding still applies to non-ASCII queries")
+    func foldsNonASCIICase() throws {
+        let root = Node(name: "/case", kind: .directory, size: 200, fileCount: 2)
+        let upper = Node(name: "КОПИЯ.txt", kind: .file, size: 100, fileCount: 1)
+        let lower = Node(name: "копия.txt", kind: .file, size: 100, fileCount: 1)
+        for child in [upper, lower] { child.parent = root }
+        root.children = [upper, lower]
+        let snapshot = Snapshot(root: root, rootPath: "/case")
+
+        #expect(snapshot.search(Filter(pattern: try Pattern("копия"))).count == 2)
+        #expect(snapshot.search(Filter(pattern: try Pattern("КОПИЯ"))).count == 2)
+    }
+}

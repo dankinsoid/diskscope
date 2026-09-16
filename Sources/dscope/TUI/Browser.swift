@@ -44,7 +44,7 @@ final class Browser {
                     continue
                 }
                 if state.search?.isEditing == true {
-                    handleSearchInput(key)
+                    if handleSearchInput(key) { break loop }
                     continue
                 }
 
@@ -123,11 +123,18 @@ final class Browser {
         }
     }
 
-    private func handleSearchInput(_ key: Key) {
+    /// Returns true when the browser should quit.
+    private func handleSearchInput(_ key: Key) -> Bool {
         switch key {
         case .enter:
             state.commitSearch()
         case .escape:
+            state.cancelSearch()
+        case .interrupt:
+            return true
+        case .character("q") where state.search?.query.isEmpty == true:
+            // An empty search box is somewhere a person can arrive by accident;
+            // leaving it should not require knowing that only esc works.
             state.cancelSearch()
         case .backspace:
             state.updateSearch { $0 = String($0.dropLast()) }
@@ -136,6 +143,7 @@ final class Browser {
         default:
             break
         }
+        return false
     }
 
     // MARK: - Deleting

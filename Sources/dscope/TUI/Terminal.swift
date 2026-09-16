@@ -111,10 +111,19 @@ final class Terminal {
         return poll(&descriptor, 1, 0) > 0
     }
 
+    /// A byte read while completing a sequence that turned out to start the
+    /// next keystroke; consumed before touching the terminal again.
+    private var pushedBack: UInt8?
+
     /// Blocks until a key is pressed.
     func readKey() -> Key? {
         var byte: UInt8 = 0
-        guard read(STDIN_FILENO, &byte, 1) == 1 else { return nil }
+        if let pending = pushedBack {
+            pushedBack = nil
+            byte = pending
+        } else {
+            guard read(STDIN_FILENO, &byte, 1) == 1 else { return nil }
+        }
 
         switch byte {
         case 0x1B:
@@ -128,7 +137,45 @@ final class Terminal {
         case 0x20:
             return .space
         default:
-            return .character(Character(UnicodeScalar(byte)))
+            return readCharacter(startingWith: byte)
+        }
+    }
+
+    /// Completes a UTF-8 sequence that began with `first`.
+    ///
+    /// A non-ASCII key arrives as two to four bytes. Treating each as its own
+    /// keystroke turns one letter into several, any of which may land on a
+    /// command — typing Cyrillic would quietly trigger quit or delete.
+    private func readCharacter(startingWith first: UInt8) -> Key? {
+        var bytes = [first]
+        let expected = Self.sequenceLength(first)
+
+        while bytes.count < expected {
+            var next: UInt8 = 0
+            guard read(STDIN_FILENO, &next, 1) == 1 else { break }
+
+            // A byte that is not a continuation starts the next keystroke. It
+            // has already been taken from the terminal, so it must be kept:
+            // dropping it silently swallows the key that follows.
+            guard next & 0b1100_0000 == 0b1000_0000 else {
+                pushedBack = next
+                break
+            }
+            bytes.append(next)
+        }
+
+        guard let scalar = String(bytes: bytes, encoding: .utf8)?.first else { return nil }
+        return .character(scalar)
+    }
+
+    /// Byte count of a UTF-8 sequence from its leading byte.
+    private static func sequenceLength(_ first: UInt8) -> Int {
+        switch first {
+        case 0x00 ... 0x7F: 1
+        case 0xC0 ... 0xDF: 2
+        case 0xE0 ... 0xEF: 3
+        case 0xF0 ... 0xF7: 4
+        default: 1  // A stray continuation byte; take it alone and move on.
         }
     }
 

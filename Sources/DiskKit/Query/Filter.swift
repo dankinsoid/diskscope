@@ -20,9 +20,15 @@ public struct Pattern: Sendable {
     ///
     /// `range(of:options:)` with case and diacritic folding costs a full Unicode
     /// normalisation per candidate, which on a tree of a million names is
-    /// seconds per keystroke. Plain ASCII folding covers almost every real
-    /// query and is orders of magnitude cheaper.
+    /// seconds per keystroke — long enough that typing appears to hang.
     private let asciiNeedle: [UInt8]?
+
+    /// Lowercased UTF-8 of a non-ASCII query.
+    ///
+    /// Case folding once on the query, then comparing bytes, keeps Cyrillic and
+    /// other scripts on the same cheap path as ASCII. It gives up diacritic
+    /// insensitivity, which matters far less than being able to type.
+    private let foldedNeedle: [UInt8]?
     /// `NSRegularExpression` is safe to match from several threads at once,
     /// which `Regex` is not; searching a snapshot fans out across cores.
     private let regex: NSRegularExpression?
@@ -32,7 +38,9 @@ public struct Pattern: Sendable {
         self.mode = mode
         self.matchesFullPath = matchesFullPath
 
-        asciiNeedle = text.allSatisfy(\.isASCII) ? Array(text.lowercased().utf8) : nil
+        let isASCII = text.allSatisfy(\.isASCII)
+        asciiNeedle = isASCII ? Array(text.lowercased().utf8) : nil
+        foldedNeedle = isASCII ? nil : Array(text.lowercased().utf8)
 
         switch mode {
         case .substring:
@@ -51,12 +59,25 @@ public struct Pattern: Sendable {
             if let asciiNeedle {
                 return Pattern.containsASCII(asciiNeedle, in: subject)
             }
+            if let foldedNeedle {
+                return Pattern.containsFolded(foldedNeedle, in: subject)
+            }
             return subject.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil
         case .glob, .regex:
             guard let regex else { return false }
             let range = NSRange(subject.startIndex ..< subject.endIndex, in: subject)
             return regex.firstMatch(in: subject, options: [], range: range) != nil
         }
+    }
+
+    /// Substring search for a non-ASCII query, folding case on the subject only.
+    ///
+    /// `lowercased()` on each name is far cheaper than the full normalisation
+    /// `range(of:options:)` performs, and is what makes typing in a non-Latin
+    /// script responsive rather than taking seconds per keystroke.
+    private static func containsFolded(_ needle: [UInt8], in subject: String) -> Bool {
+        guard !needle.isEmpty else { return true }
+        return Array(subject.lowercased().utf8).containsSubsequenceOfBytes(needle)
     }
 
     /// Case-insensitive substring search over UTF-8, without normalising.
@@ -177,5 +198,24 @@ public enum NodeOrder: String, Sendable, CaseIterable {
         case .modified: (first.modified ?? .distantPast) > (second.modified ?? .distantPast)
         case .accessed: (first.accessed ?? .distantPast) > (second.accessed ?? .distantPast)
         }
+    }
+}
+
+extension Array where Element == UInt8 {
+
+    /// Plain byte-wise substring search.
+    func containsSubsequenceOfBytes(_ needle: [UInt8]) -> Bool {
+        guard !needle.isEmpty, count >= needle.count else { return needle.isEmpty }
+
+        let first = needle[0]
+        for start in 0 ... (count - needle.count) where self[start] == first {
+            var matched = true
+            for offset in 1 ..< needle.count where self[start + offset] != needle[offset] {
+                matched = false
+                break
+            }
+            if matched { return true }
+        }
+        return false
     }
 }
