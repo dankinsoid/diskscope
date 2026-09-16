@@ -53,6 +53,15 @@ $ dscope scan ~/Code --depth 1 --min 10GB
 this is 14% of the 434 GB in use on /System/Volumes/Data; 374 GB is elsewhere
 ```
 
+Refresh a snapshot without rescanning the disk — the filesystem is asked what
+changed, and only that is re-measured:
+
+```console
+$ dscope update ~/home.dscope
+re-measured 2 directories in 0.0s, +250 MB
+60.1 GB	/Users/you/Code
+```
+
 Save a snapshot, then explore it without rescanning:
 
 ```console

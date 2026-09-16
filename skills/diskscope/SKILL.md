@@ -24,7 +24,17 @@ Pass the snapshot path wherever a directory would go:
 dscope top /tmp/home.dscope --json --count 20
 ```
 
-Re-scan only when the user has deleted things and wants updated numbers.
+To refresh a snapshot, use `dscope update` rather than scanning again: it asks
+the filesystem which paths changed and re-measures only those, usually in under
+a second where a full scan takes minutes.
+
+```bash
+dscope update /tmp/disk.dscope --json
+```
+
+`rescannedDirectories` and `deltaBytes` say what moved. `fullScanReason` is set
+when the change journal could not answer and everything was re-measured anyway —
+that is expected for a snapshot more than a few days old.
 
 ## Commands
 

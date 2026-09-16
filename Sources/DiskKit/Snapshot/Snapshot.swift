@@ -12,13 +12,20 @@ public struct Snapshot: Sendable {
     /// What the filesystem reported for the scanned volume at scan time.
     public let volume: VolumeInfo?
 
+    /// Position in the filesystem's change journal when the scan began.
+    ///
+    /// Recorded before walking rather than after, so a change made during the
+    /// scan is replayed later instead of being missed by both.
+    public let journalPosition: UInt64
+
     public init(
         root: Node,
         rootPath: String,
         scannedAt: Date = Date(),
         options: ScanOptions = ScanOptions(),
         duration: TimeInterval = 0,
-        volume: VolumeInfo? = nil
+        volume: VolumeInfo? = nil,
+        journalPosition: UInt64 = 0
     ) {
         self.root = root
         self.rootPath = rootPath
@@ -26,6 +33,7 @@ public struct Snapshot: Sendable {
         self.options = options
         self.duration = duration
         self.volume = volume
+        self.journalPosition = journalPosition
     }
 
     /// Measured size set against what the volume reports in use.

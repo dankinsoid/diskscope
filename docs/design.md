@@ -51,6 +51,24 @@ A scan is written to disk and reopened later. This gives instant re-filtering,
 and makes it possible to diff two scans — "what grew this week" — which is often
 a faster route to the culprit than absolute size.
 
+## Staying up to date
+
+Rescanning a disk to refresh a snapshot spends minutes re-measuring directories
+nothing has touched. Checking `mtime` does not help: a directory's mtime moves
+only when its immediate children change, so it says nothing about what happened
+deeper down.
+
+FSEvents does know. macOS keeps a journal of changed paths, and a scan that
+records the journal position can later ask what has happened since. Only those
+subtrees are re-measured, and each ancestor's totals are corrected by the
+difference — so an update costs what the changes cost, not what the disk costs.
+
+The journal cannot always answer: it is finite, events can be dropped, and
+replaying a long history costs more than a fresh scan. Each of those cases falls
+back to a full scan and says which one happened. Tests assert the property that
+makes the whole thing worth having — an updated snapshot must equal a freshly
+scanned one, node for node.
+
 ## Selection
 
 Bulk selection is a primary workflow, not a convenience. The shape of it:

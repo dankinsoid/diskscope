@@ -31,6 +31,9 @@ struct SourceOptions: ParsableArguments {
         let progress = quiet ? nil : ProgressReporter(scanner: scanner)
         progress?.start()
 
+        // Taken before walking: a change made mid-scan is then replayed by the
+        // next update rather than missed by both.
+        let journalPosition = ChangeJournal.currentPosition()
         let started = Date()
         let root = scanner.scan(path: path)
         let duration = Date().timeIntervalSince(started)
@@ -45,7 +48,8 @@ struct SourceOptions: ParsableArguments {
                 rootPath: path,
                 options: scanner.options,
                 duration: duration,
-                volume: VolumeInfo(path: path)
+                volume: VolumeInfo(path: path),
+                journalPosition: journalPosition
             )
         )
     }

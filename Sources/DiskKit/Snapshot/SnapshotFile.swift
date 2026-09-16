@@ -9,7 +9,7 @@ import Foundation
 public enum SnapshotFile {
 
     static let magic: UInt32 = 0x64_73_63_70  // "dscp"
-    static let version: UInt16 = 2
+    static let version: UInt16 = 3
 
     public static func write(_ snapshot: Snapshot, to url: URL) throws {
         var strings = StringTable()
@@ -30,6 +30,7 @@ public enum SnapshotFile {
         output.append(byte: snapshot.options.deduplicateHardLinks ? 1 : 0)
         output.append(string: snapshot.rootPath)
         output.append(volume: snapshot.volume)
+        output.append(uint64: snapshot.journalPosition)
         output.append(data: strings.encoded())
         output.append(uint64: UInt64(snapshot.root.subtreeCount))
         output.append(nodes)
@@ -53,8 +54,9 @@ public enum SnapshotFile {
             deduplicateHardLinks: try reader.byte() == 1
         )
         let rootPath = try reader.string()
-        // Volume figures arrived in version 2; older files simply lack them.
+        // Volume figures arrived in version 2, the journal position in 3.
         let volume = fileVersion >= 2 ? try reader.volume() : nil
+        let journalPosition = fileVersion >= 3 ? try reader.uint64() : 0
         let strings = try StringTable(reader: &reader)
         let count = Int(try reader.uint64())
 
@@ -67,7 +69,8 @@ public enum SnapshotFile {
             scannedAt: scannedAt,
             options: options,
             duration: duration,
-            volume: volume
+            volume: volume,
+            journalPosition: journalPosition
         )
     }
 
