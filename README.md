@@ -13,8 +13,9 @@ about it instantly — what is large, what is stale, and what can go.
 Drawing a tree of sizes is the easy part. The hard question is *"can I delete
 this?"*, and that is what the tool is shaped around.
 
-- **Scan once, ask many times.** A snapshot of 1.4M entries loads in 0.3s,
-  against 10s to rescan. Filtering and sorting never touch the disk again.
+- **Scan once, ask many times.** A whole disk — 5M entries — scans in about
+  three minutes and saves to a 348MB snapshot. Reopening it takes under a
+  second, so filtering and sorting never touch the disk again.
 - **Search and bulk delete with exceptions.** Match by name, glob or regex,
   then keep the ones still in use.
 - **Facts that inform the decision.** Last access time, file counts, and sizes
