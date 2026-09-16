@@ -37,7 +37,7 @@ public struct ScanProgress: Sendable {
 /// blocking syscalls, so threads stay saturated while the kernel reads metadata.
 public final class DiskScanner: @unchecked Sendable {
 
-    private let options: ScanOptions
+    public let options: ScanOptions
     private let state = State()
 
     public init(options: ScanOptions = ScanOptions()) {

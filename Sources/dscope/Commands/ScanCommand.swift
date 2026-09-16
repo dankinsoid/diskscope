@@ -2,31 +2,42 @@ import ArgumentParser
 import DiskKit
 import Foundation
 
-struct ScanCommand: AsyncParsableCommand {
+struct ScanCommand: ParsableCommand {
 
     static let configuration = CommandConfiguration(
         commandName: "scan",
-        abstract: "Scan a directory tree and print it."
+        abstract: "Scan a directory and show what is using space."
     )
 
-    @Argument(help: "Root to scan.")
-    var path: String = FileManager.default.homeDirectoryForCurrentUser.path
+    @OptionGroup var source: SourceOptions
+    @OptionGroup var format: FormatOptions
 
-    @Option(name: .customLong("save"), help: "Write the scan to a snapshot file.")
-    var savePath: String?
+    @Option(name: .shortAndLong, help: "How many levels to show.")
+    var depth = 2
 
-    func run() async throws {
-        let scanner = DiskScanner()
-        let started = Date()
-        let root = scanner.scan(path: path)
-        let elapsed = Date().timeIntervalSince(started)
-        print("\(root.path)  \(root.size) bytes  \(root.fileCount) files  \(String(format: "%.2fs", elapsed))")
+    @Option(name: .shortAndLong, help: "Hide entries smaller than this, e.g. 1GB.")
+    var min = "0"
 
-        if let savePath {
-            let snapshot = Snapshot(root: root, rootPath: path, duration: elapsed)
-            let writeStarted = Date()
-            try SnapshotFile.write(snapshot, to: URL(fileURLWithPath: savePath))
-            print("saved in \(String(format: "%.2fs", Date().timeIntervalSince(writeStarted)))")
+    @Option(name: .long, help: "Write the scan to a snapshot for later exploring.")
+    var save: String?
+
+    func run() throws {
+        let minimumSize = try SizeArgument.parse(min)
+        let snapshot = try source.load(quiet: format.json)
+
+        if let save {
+            try SnapshotFile.write(snapshot, to: URL(fileURLWithPath: save))
+            Output.note("saved snapshot to \(save)")
+        }
+
+        if format.json {
+            let tree = NodeJSON.tree(snapshot.root, depth: depth, minimumSize: minimumSize)
+            try Output.emit(ScanReportJSON(snapshot: snapshot, tree: tree), pretty: format.pretty)
+        } else {
+            print(TreeRenderer.render(snapshot.root, depth: depth, minimumSize: minimumSize))
+            if !snapshot.unreadablePaths.isEmpty {
+                Output.note("\(snapshot.unreadablePaths.count) directories could not be read; sizes are lower bounds")
+            }
         }
     }
 }

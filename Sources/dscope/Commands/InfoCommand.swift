@@ -3,20 +3,32 @@ import DiskKit
 import Foundation
 
 struct InfoCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "info", abstract: "Describe a snapshot.")
 
-    @Argument var snapshotPath: String
+    static let configuration = CommandConfiguration(
+        commandName: "info",
+        abstract: "Describe a saved snapshot."
+    )
+
+    @Argument(help: "Snapshot file.")
+    var path: String
+
+    @OptionGroup var format: FormatOptions
 
     func run() throws {
-        let started = Date()
-        let snapshot = try SnapshotFile.read(from: URL(fileURLWithPath: snapshotPath))
-        let elapsed = Date().timeIntervalSince(started)
-        var nodes = 0
-        snapshot.root.walk { _ in nodes += 1 }
-        print("root:     \(snapshot.rootPath)")
-        print("size:     \(snapshot.totalSize)")
-        print("files:    \(snapshot.fileCount)")
-        print("nodes:    \(nodes)")
-        print("loaded:   \(String(format: "%.2fs", elapsed))")
+        let snapshot = try SnapshotFile.read(from: URL(fileURLWithPath: path))
+
+        if format.json {
+            try Output.emit(ScanReportJSON(snapshot: snapshot, tree: nil), pretty: format.pretty)
+            return
+        }
+
+        print("root        \(snapshot.rootPath)")
+        print("scanned     \(snapshot.scannedAt.formatted()) (\(snapshot.scannedAt.relativeAge))")
+        print("size        \(snapshot.totalSize.formattedBytes())")
+        print("files       \(snapshot.fileCount)")
+        print("scan time   \(String(format: "%.1fs", snapshot.duration))")
+        if !snapshot.unreadablePaths.isEmpty {
+            print("unreadable  \(snapshot.unreadablePaths.count) directories")
+        }
     }
 }
