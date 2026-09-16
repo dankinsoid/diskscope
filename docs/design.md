@@ -30,8 +30,16 @@ Sizes are allocated blocks, matching `du`:
 
 - sparse files and compressed files count what they occupy, not their logical size;
 - hard links count once per inode, tracked in a shared set of seen inodes;
-- mount points are not crossed by default — on macOS the data volume is
-  firmlinked into `/`, so crossing counts the same bytes twice.
+- directories are visited once per inode as well;
+- mount points are not crossed by default, so a scan stays off external and
+  network volumes.
+
+That third rule is what makes a scan of `/` correct. macOS firmlinks
+`/System/Volumes/Data` onto `/`, so most of the disk is reachable by two paths
+— and both report the same device id, which is why staying on one device is not
+enough. Measured against a disk holding 384 GB, walking both paths reported
+759 GB. The two paths do share an inode, so counting inodes catches what device
+ids cannot, and the same rule makes symlink loops harmless.
 
 Not covered by any tree walk, and reported separately: APFS local snapshots.
 They routinely hold tens of gigabytes and explain most of the gap between "free
