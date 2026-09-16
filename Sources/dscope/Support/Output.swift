@@ -21,9 +21,12 @@ enum TreeRenderer {
         _ node: Node,
         depth: Int,
         minimumSize: Int64,
-        selection: Selection? = nil
+        selection: Selection? = nil,
+        rootLabel: String? = nil
     ) -> String {
-        var lines: [String] = ["\(node.size.formattedBytes())\t\(node.path)"]
+        // A subtree taken out of a snapshot has no parent, so its own path is
+        // only a name; the caller knows where it came from.
+        var lines: [String] = ["\(node.size.formattedBytes())\t\(rootLabel ?? node.path)"]
         append(children: node, prefix: "", depth: depth, minimumSize: minimumSize, selection: selection, into: &lines)
         return lines.joined(separator: "\n")
     }

@@ -48,7 +48,11 @@ struct ScanCommand: ParsableCommand {
         }
 
         let minimumSize = explicitMinimum ?? Self.defaultThreshold(for: snapshot)
-        print(TreeRenderer.render(snapshot.root, depth: depth, minimumSize: minimumSize))
+        print(
+            TreeRenderer.render(
+                snapshot.root, depth: depth, minimumSize: minimumSize, rootLabel: snapshot.rootPath
+            )
+        )
 
         if explicitMinimum == nil, minimumSize > 0 {
             Output.note("hiding entries under \(minimumSize.formattedBytes()); pass --min 0 to show everything")
