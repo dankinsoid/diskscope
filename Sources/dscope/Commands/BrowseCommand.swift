@@ -27,6 +27,11 @@ struct BrowseCommand: ParsableCommand {
     /// takes minutes before anything appears.
     static let defaultPath = FileManager.default.homeDirectoryForCurrentUser.path
 
+    /// Keeps the parting summary to a handful of lines.
+    private func summaryThreshold(for snapshot: Snapshot) -> Int64 {
+        max(1_048_576, snapshot.totalSize / 50)
+    }
+
     func validate() throws {
         guard Terminal.isInteractive else {
             throw ValidationError("browse needs a terminal; use 'scan' or 'search' when piping output")
@@ -40,6 +45,13 @@ struct BrowseCommand: ParsableCommand {
         }
         let snapshot = try source.load(summary: false)
         let deleted = Browser(snapshot: snapshot).run()
+
+        // The browser draws on the alternate screen, which is restored on exit —
+        // without this the terminal looks as though nothing ever ran.
+        print(TreeRenderer.render(snapshot.root, depth: 1, minimumSize: summaryThreshold(for: snapshot)))
+        if deleted.isEmpty {
+            Output.note("save this scan with: dscope scan \(snapshot.rootPath) --save <file>")
+        }
 
         // Printed after leaving the alternate screen, so it survives on screen.
         if !deleted.isEmpty {

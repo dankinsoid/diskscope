@@ -68,10 +68,14 @@ struct SearchTests {
         #expect(snapshot.search(Filter(minimumSize: 4_500)).map(\.name) == ["app"])
         #expect(snapshot.search(Filter(kinds: [.file])).map(\.name) == ["README.md"])
 
-        let stale = snapshot.search(Filter(notAccessedSince: Date(timeIntervalSince1970: 1_700_000_000)))
+        let stale = snapshot.search(
+            Filter(accessed: AgeBound(before: Date(timeIntervalSince1970: 1_700_000_000)))
+        )
         #expect(stale.map(\.name) == ["README.md"])
 
-        let recent = snapshot.search(Filter(notAccessedSince: Date(timeIntervalSince1970: 1_500_000_000)))
+        let recent = snapshot.search(
+            Filter(accessed: AgeBound(before: Date(timeIntervalSince1970: 1_500_000_000)))
+        )
         #expect(recent.isEmpty)
     }
 

@@ -10,6 +10,15 @@ struct SourceOptions: ParsableArguments {
     @Argument(help: "Directory to scan, or a snapshot file to read. Defaults to the whole disk.")
     var path: String = SourceOptions.wholeDisk
 
+    /// Creates options for a command that takes its path some other way.
+    static func forPath(_ path: String, crossMounts: Bool = false, under: String? = nil) -> SourceOptions {
+        var options = SourceOptions()
+        options.path = path
+        options.crossMounts = crossMounts
+        options.under = under
+        return options
+    }
+
     @Flag(name: .long, help: "Cross mount points, counting other volumes too.")
     var crossMounts = false
 

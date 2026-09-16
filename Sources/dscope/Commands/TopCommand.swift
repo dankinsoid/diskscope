@@ -10,31 +10,28 @@ struct TopCommand: ParsableCommand {
     )
 
     @OptionGroup var source: SourceOptions
+    @OptionGroup var filter: FilterOptions
     @OptionGroup var format: FormatOptions
 
     @Option(name: .shortAndLong, help: "How many entries to list.")
     var count = 20
 
-    @Flag(name: .long, help: "List files only, ignoring directories.")
-    var filesOnly = false
-
-    @Option(name: .long, help: "List only entries untouched for this many days.")
+    @Option(name: .long, help: "List only entries untouched for this many days; the same as --accessed +Nd.")
     var staleDays: Int?
 
     func run() throws {
         let snapshot = try source.load(quiet: format.json)
 
-        var nodes: [Node]
+        var conditions = try filter.build()
         if let staleDays {
-            let cutoff = Date(timeIntervalSinceNow: -Double(staleDays) * 86_400)
-            let filter = Filter(
-                kinds: filesOnly ? [.file] : nil,
-                notAccessedSince: cutoff
-            )
-            nodes = snapshot.searchTopmost(filter, limit: count, sortedBy: .size)
-        } else {
-            nodes = snapshot.largest(count, kinds: filesOnly ? [.file] : nil)
+            conditions.accessed = AgeBound(before: Date(timeIntervalSinceNow: -Double(staleDays) * 86_400))
         }
+
+        // With no conditions the question is simply "what is biggest", which is
+        // answered by skipping directories that merely contain one large child.
+        let nodes = conditions.isEmpty
+            ? snapshot.largest(count)
+            : snapshot.searchTopmost(conditions, limit: count, sortedBy: .size)
 
         if format.json {
             try Output.emit(

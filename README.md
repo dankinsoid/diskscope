@@ -83,6 +83,18 @@ re-measured 2 directories in 0.0s, +250 MB
 60.1 GB	/Users/you/Code
 ```
 
+Conditions combine, in the manner of `find`:
+
+```console
+$ dscope search ~/home.dscope --name .build --glob --size +500MB
+$ dscope search ~/home.dscope --size +1GB --accessed 'over 6m'
+$ dscope top ~/home.dscope --dirs-only --modified 'within 7d'
+```
+
+`--size` and `--accessed` take `+N` for "at least" and `-N` for "at most", or
+the words `over`, `under` and `within` where a leading dash would be read as a
+flag. Time units are `h d w m y`.
+
 Save a snapshot, then explore it without rescanning:
 
 ```console

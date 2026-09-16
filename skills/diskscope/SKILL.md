@@ -48,17 +48,38 @@ that is expected for a snapshot more than a few days old.
 | Volumes and snapshots | `dscope volumes --json` |
 | Largest entries anywhere | `dscope top <path> --count 20 --json` |
 | Large and untouched | `dscope top <path> --stale-days 180 --json` |
-| Find by name | `dscope search <query> <path> --mode glob --json` |
+| Find by name | `dscope search <query> <path> --glob --json` |
+| Large and forgotten | `dscope search <path> --size +1GB --accessed '+6m' --json` |
 | Plan a cleanup | `dscope clean <query> <path> --except <keep> --json` |
 
-Options differ per command — these are not interchangeable:
+### Conditions
+
+`search`, `top` and `clean` take the same conditions, and they combine — each
+one narrows the result further, as find(1) predicates do:
+
+| Condition | Meaning |
+|---|---|
+| `--name <pattern>` | match by name; add `--glob`, `--regex` or `--path` |
+| `--size '+1GB'` / `--size 'over 1GB'` | at least that big |
+| `--size '-100MB'` / `--size 'under 100MB'` | at most that big |
+| `--accessed '+6m'` / `--accessed 'over 6m'` | not read for six months |
+| `--modified 'within 7d'` | written in the last week |
+| `--files-only`, `--dirs-only` | restrict to one kind |
+| `--unreadable` | only entries that could not be read |
+
+Units are `h d w m y`. Repeat `--size` or `--accessed` to bound both ends.
+
+**Write `-7d` as `'within 7d'` or `--modified=-7d`** — a bare leading dash is
+read as a flag, and the command fails with "Missing value".
+
+Command-specific options:
 
 | Command | Options |
 |---|---|
 | `scan` | `--depth`, `--min`, `--save`, `--under` |
-| `search` | `--mode`, `--min`, `--limit`, `--sort`, `--full-path`, `--include-nested`, `--under` |
-| `top` | `--count`, `--files-only`, `--stale-days`, `--under` |
-| `clean` | `--mode`, `--min`, `--except`, `--apply`, `--yes`, `--permanent` |
+| `search` | `--limit`, `--sort`, `--include-nested`, `--under` |
+| `top` | `--count`, `--stale-days`, `--under` |
+| `clean` | `--except`, `--apply`, `--yes`, `--permanent` |
 
 `--under <path>` re-roots a snapshot on a subtree, which is how you look inside
 one directory without rescanning or printing the whole disk:

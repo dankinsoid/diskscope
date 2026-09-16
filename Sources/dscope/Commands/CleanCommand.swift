@@ -21,6 +21,7 @@ struct CleanCommand: ParsableCommand {
     var query: String
 
     @OptionGroup var source: SourceOptions
+    @OptionGroup var filter: FilterOptions
     @OptionGroup var format: FormatOptions
 
     @Option(name: .shortAndLong, help: "Match as substring, glob or regex.")
@@ -52,12 +53,13 @@ struct CleanCommand: ParsableCommand {
 
     func run() throws {
         let snapshot = try source.load(quiet: format.json)
-        let filter = Filter(
-            pattern: try Pattern(query, mode: mode),
-            minimumSize: try SizeArgument.parse(min)
-        )
+        var conditions = try filter.build(defaultPattern: query)
+        conditions.pattern = try Pattern(query, mode: mode)
+        if conditions.size.isEmpty {
+            conditions.size = SizeBound(minimum: try SizeArgument.parse(min))
+        }
 
-        let matches = snapshot.searchTopmost(filter, sortedBy: .size)
+        let matches = snapshot.searchTopmost(conditions, sortedBy: .size)
         let kept = matches.filter { node in except.contains { node.path.contains($0) } }
         let doomed = matches.filter { node in !except.contains { node.path.contains($0) } }
 

@@ -163,7 +163,7 @@ enum Tools {
         if let staleDays = arguments["staleDays"]?.intValue {
             let cutoff = Date(timeIntervalSinceNow: -Double(staleDays) * 86_400)
             nodes = snapshot.searchTopmost(
-                Filter(kinds: kinds, notAccessedSince: cutoff), limit: count
+                Filter(kinds: kinds, accessed: AgeBound(before: cutoff)), limit: count
             )
         } else {
             nodes = snapshot.largest(count, kinds: kinds)

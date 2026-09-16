@@ -105,44 +105,58 @@ public struct Pattern: Sendable {
 }
 
 /// Narrows a snapshot down to the nodes worth looking at.
+/// A conjunction of constraints an entry must satisfy.
+///
+/// Every field narrows the result further, the way `find` predicates do, so any
+/// combination is meaningful: a name pattern, a size range, how long ago it was
+/// touched, and what kind of entry it is.
 public struct Filter: Sendable {
 
     public var pattern: Pattern?
-    public var minimumSize: Int64?
+    public var size: SizeBound
     public var kinds: Set<Node.Kind>?
 
-    /// Keep only entries not accessed since this date.
-    public var notAccessedSince: Date?
+    /// When the entry was last read.
+    public var accessed: AgeBound
+
+    /// When the entry was last written.
+    public var modified: AgeBound
 
     /// Keep only entries whose subtree could not be fully read.
     public var unreadableOnly: Bool
 
     public init(
         pattern: Pattern? = nil,
-        minimumSize: Int64? = nil,
+        size: SizeBound = SizeBound(),
         kinds: Set<Node.Kind>? = nil,
-        notAccessedSince: Date? = nil,
+        accessed: AgeBound = AgeBound(),
+        modified: AgeBound = AgeBound(),
         unreadableOnly: Bool = false
     ) {
         self.pattern = pattern
-        self.minimumSize = minimumSize
+        self.size = size
         self.kinds = kinds
-        self.notAccessedSince = notAccessedSince
+        self.accessed = accessed
+        self.modified = modified
         self.unreadableOnly = unreadableOnly
     }
 
+    /// Convenience for the common "at least this big" case.
+    public init(pattern: Pattern? = nil, minimumSize: Int64?) {
+        self.init(pattern: pattern, size: SizeBound(minimum: minimumSize))
+    }
+
     public var isEmpty: Bool {
-        pattern == nil && minimumSize == nil && kinds == nil
-            && notAccessedSince == nil && !unreadableOnly
+        pattern == nil && size.isEmpty && kinds == nil
+            && accessed.isEmpty && modified.isEmpty && !unreadableOnly
     }
 
     public func matches(_ node: Node) -> Bool {
-        if let minimumSize, node.size < minimumSize { return false }
+        guard size.contains(node.size) else { return false }
         if let kinds, !kinds.contains(node.kind) { return false }
         if unreadableOnly, node.error == nil { return false }
-        if let notAccessedSince {
-            guard let accessed = node.accessed, accessed < notAccessedSince else { return false }
-        }
+        if !accessed.isEmpty, !accessed.contains(node.accessed) { return false }
+        if !modified.isEmpty, !modified.contains(node.modified) { return false }
         if let pattern, !pattern.matches(node) { return false }
         return true
     }
