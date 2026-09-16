@@ -21,17 +21,25 @@ struct SourceOptions: ParsableArguments {
     var snapshot: String?
 
     /// Creates options for a command that takes its path some other way.
+    /// Builds options for a command that takes its path some other way.
+    ///
+    /// Every field is assigned: a property wrapper left untouched by parsing
+    /// holds no value at all, and reading one fails at runtime rather than
+    /// falling back to a default.
     static func forPath(
         _ path: String,
         snapshot: String? = nil,
         crossMounts: Bool = false,
+        allVolumes: Bool = false,
         under: String? = nil
     ) -> SourceOptions {
         var options = SourceOptions()
         options.path = path
         options.snapshot = snapshot
         options.crossMounts = crossMounts
+        options.allVolumes = allVolumes
         options.under = under
+        options.previousSize = nil
         return options
     }
 

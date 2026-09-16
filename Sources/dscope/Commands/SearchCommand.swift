@@ -12,8 +12,8 @@ struct SearchCommand: ParsableCommand {
         how long ago something was touched are all one query.
 
           dscope search --name .build --glob --size +500MB
-          dscope search --size +1GB --accessed +6m
-          dscope search --name node_modules --modified -7d
+          dscope search ~/Code --size +1GB --accessed 'over 6m'
+          dscope search --snapshot ~/disk.dscope --name node_modules
 
         Matches are reported largest first. A match inside another match is \
         omitted, so summing the results never counts the same bytes twice — a \
@@ -21,11 +21,16 @@ struct SearchCommand: ParsableCommand {
         """
     )
 
-    @Argument(help: ArgumentHelp("Name to match, as with --name.", valueName: "pattern"))
-    var pattern: String?
+    @Argument(
+        help: ArgumentHelp(
+            "A pattern to match, or the directory to scan when it is the only one.",
+            valueName: "pattern"
+        )
+    )
+    var firstPositional: String?
 
     @Argument(help: "Directory to scan. Defaults to the whole disk.")
-    var path: String = SourceOptions.wholeDisk
+    var secondPositional: String = ""
 
     @Option(
         name: [.customShort("S"), .long],
@@ -54,30 +59,23 @@ struct SearchCommand: ParsableCommand {
     @Option(name: .shortAndLong, help: "Sort by size, name, files, modified or accessed.")
     var sort: NodeOrder = .size
 
-    func validate() throws {
-        if filter.name == nil, pattern == nil, !hasNonNameCondition {
-            throw ValidationError("give something to match: a pattern, --size, --accessed or --modified")
-        }
-        if filter.glob || filter.regex || filter.path, filter.name == nil, pattern == nil {
-            throw ValidationError("--glob, --regex and --path describe a pattern, which was not given")
-        }
-    }
-
-    private var hasNonNameCondition: Bool {
-        !filter.size.isEmpty || !filter.accessed.isEmpty || !filter.modified.isEmpty
-            || filter.filesOnly || filter.dirsOnly || filter.unreadable
-    }
-
     func run() throws {
+        let resolved = resolvePositionals()
+
         var filter = filter
         if let mode {
             // The older --mode spelling, kept working alongside --glob/--regex.
             filter.glob = mode == .glob
             filter.regex = mode == .regex
         }
-        let conditions = try filter.build(defaultPattern: pattern)
+
+        let conditions = try filter.build(defaultPattern: resolved.pattern)
+        guard !conditions.isEmpty else {
+            throw ValidationError("give something to match: a pattern, --size, --accessed or --modified")
+        }
+
         let source = SourceOptions.forPath(
-            path, snapshot: snapshot, crossMounts: crossMounts, under: under
+            resolved.path, snapshot: snapshot, crossMounts: crossMounts, under: under
         )
         let snapshot = try source.load(quiet: format.json)
 
@@ -93,7 +91,7 @@ struct SearchCommand: ParsableCommand {
         if format.json {
             try Output.emit(
                 SearchReportJSON(
-                    query: filter.name ?? pattern ?? "",
+                    query: filter.name ?? resolved.pattern ?? "",
                     mode: filter.mode,
                     matches: matches,
                     truncated: truncated,
@@ -111,15 +109,39 @@ struct SearchCommand: ParsableCommand {
         for node in matches {
             print("\(node.size.formattedBytes())\t\(node.path)")
         }
+
         let total = found.reduce(Int64(0)) { $0 + $1.size }
         if truncated {
-            Output.note(
-                "showing \(matches.count) of \(found.count) matches;"
-                    + " \(total.formattedBytes()) in total"
-            )
+            Output.note("showing \(matches.count) of \(found.count) matches; \(total.formattedBytes()) in total")
         } else {
             Output.note("\(matches.count) matches, \(total.formattedBytes()) total")
         }
+    }
+
+    /// Works out which positional is the pattern and which is the path.
+    ///
+    /// With one argument the question is which it is. An explicit `--name`
+    /// settles it; otherwise something that exists on disk is the path, since
+    /// `search ~/Code --name .build` must not scan the whole disk looking for a
+    /// directory named "~/Code".
+    ///
+    /// Done here rather than in a property, because option groups hold no value
+    /// until parsing has finished.
+    private func resolvePositionals() -> (pattern: String?, path: String) {
+        func existsOnDisk(_ argument: String) -> Bool {
+            FileManager.default.fileExists(atPath: (argument as NSString).expandingTildeInPath)
+        }
+
+        if !secondPositional.isEmpty {
+            return (firstPositional, secondPositional)
+        }
+        guard let only = firstPositional else {
+            return (nil, SourceOptions.wholeDisk)
+        }
+        if filter.name != nil || existsOnDisk(only) {
+            return (nil, only)
+        }
+        return (only, SourceOptions.wholeDisk)
     }
 }
 
