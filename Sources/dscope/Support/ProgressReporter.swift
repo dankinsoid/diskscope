@@ -21,6 +21,7 @@ final class ProgressReporter {
 
     private final class State: @unchecked Sendable {
         let lock = NSLock()
+        let stopped = DispatchSemaphore(value: 0)
         var isFinished = false
         var frame = 0
 
@@ -37,6 +38,14 @@ final class ProgressReporter {
             isFinished = true
             lock.unlock()
         }
+
+        func awaitExit(timeout: TimeInterval) {
+            _ = stopped.wait(timeout: .now() + timeout)
+        }
+
+        func signalExit() {
+            stopped.signal()
+        }
     }
 
     static var isSupported: Bool {
@@ -44,7 +53,10 @@ final class ProgressReporter {
     }
 
     func start() {
-        guard Self.isSupported else { return }
+        guard Self.isSupported else {
+            state.signalExit()
+            return
+        }
         hideCursor()
         let thread = Thread { [weak self] in self?.loop() }
         thread.qualityOfService = .utility
@@ -54,11 +66,16 @@ final class ProgressReporter {
     func stop() {
         state.finish()
         guard Self.isSupported else { return }
+
+        // Wait for the drawing thread to notice: anything it writes after this
+        // returns lands on whatever the caller draws next, such as a TUI frame.
+        state.awaitExit(timeout: 1)
         write(clearLine)
         showCursor()
     }
 
     private func loop() {
+        defer { state.signalExit() }
         while let frame = state.next() {
             render(frame: frame)
             Thread.sleep(forTimeInterval: interval)

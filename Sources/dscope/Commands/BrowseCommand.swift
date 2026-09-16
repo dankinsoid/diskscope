@@ -20,6 +20,13 @@ struct BrowseCommand: ParsableCommand {
 
     @OptionGroup var source: SourceOptions
 
+    /// Where a bare `dscope` starts.
+    ///
+    /// The home directory rather than the whole disk: it holds what a person
+    /// can actually act on, and scanning it takes seconds where a full disk
+    /// takes minutes before anything appears.
+    static let defaultPath = FileManager.default.homeDirectoryForCurrentUser.path
+
     func validate() throws {
         guard Terminal.isInteractive else {
             throw ValidationError("browse needs a terminal; use 'scan' or 'search' when piping output")
@@ -27,7 +34,11 @@ struct BrowseCommand: ParsableCommand {
     }
 
     func run() throws {
-        let snapshot = try source.load()
+        var source = source
+        if source.path == SourceOptions.wholeDisk, !CommandLine.arguments.contains(SourceOptions.wholeDisk) {
+            source.path = Self.defaultPath
+        }
+        let snapshot = try source.load(summary: false)
         let deleted = Browser(snapshot: snapshot).run()
 
         // Printed after leaving the alternate screen, so it survives on screen.

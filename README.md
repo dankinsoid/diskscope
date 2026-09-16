@@ -24,10 +24,17 @@ this?"*, and that is what the tool is shaped around.
 
 ## Usage
 
-Explore a scan interactively:
+Run it with no arguments to scan your home directory and explore the result:
 
 ```console
-$ dscope browse ~
+$ dscope
+```
+
+Or point it at a directory or a saved snapshot:
+
+```console
+$ dscope ~/Code
+$ dscope ~/home.dscope
 ```
 
 Arrow keys or `hjkl` move, `→` enters a directory, `←` goes back. `/` searches

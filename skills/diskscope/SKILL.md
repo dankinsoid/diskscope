@@ -8,6 +8,10 @@ description: Find what is using disk space and delete safely with dscope. Use wh
 `dscope` reports disk usage and deletes what the user chooses. Every command
 takes `--json`; use it, and read the fields rather than parsing the text output.
 
+Note that a bare `dscope`, or `dscope <path>`, opens an interactive browser when
+stdout is a terminal. Always name the command you want — `dscope scan <path>`,
+`dscope search ...` — so output is never an interactive session.
+
 ## Always scan to a snapshot first
 
 `dscope` scans the whole disk by default, which takes a few minutes; a home

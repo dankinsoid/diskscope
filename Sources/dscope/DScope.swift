@@ -1,18 +1,64 @@
 import ArgumentParser
+import Foundation
 
+/// Entry point, so the bare invocation can be redirected before parsing.
 @main
+enum Main {
+
+    static func main() {
+        var arguments = Array(CommandLine.arguments.dropFirst())
+        if DScope.shouldBrowse(arguments) {
+            arguments.insert("browse", at: 0)
+        }
+        DScope.main(arguments)
+    }
+}
+
 struct DScope: ParsableCommand {
 
     static let configuration = CommandConfiguration(
         commandName: "dscope",
         abstract: "Find what is eating your disk space.",
         discussion: """
-        Every command reads either a directory or a snapshot saved by \
-        'dscope scan --save', and every command takes --json, so the tool is \
-        usable from scripts and agents without the interactive interface.
+        Run with no arguments to explore interactively. Every command reads \
+        either a directory or a snapshot saved by 'dscope scan --save', and \
+        every command takes --json, so the tool is usable from scripts and \
+        agents without the interactive interface.
         """,
         version: "0.1.0",
-        subcommands: [BrowseCommand.self, ScanCommand.self, SearchCommand.self, TopCommand.self, CleanCommand.self, VolumesCommand.self, AccessCommand.self, UpdateCommand.self, InfoCommand.self],
+        subcommands: [
+            BrowseCommand.self,
+            ScanCommand.self,
+            SearchCommand.self,
+            TopCommand.self,
+            CleanCommand.self,
+            VolumesCommand.self,
+            AccessCommand.self,
+            UpdateCommand.self,
+            InfoCommand.self,
+        ],
         defaultSubcommand: ScanCommand.self
     )
+
+    /// Whether a bare invocation should open the browser.
+    ///
+    /// `defaultSubcommand` is resolved statically, so the choice between
+    /// browsing and printing has to be made before parsing. Only an argument
+    /// list that names no subcommand is rewritten, which leaves explicit
+    /// commands and piped output alone.
+    static func shouldBrowse(_ arguments: [String]) -> Bool {
+        guard Terminal.isInteractive else { return false }
+
+        // Listed explicitly: reading them back off `configuration` would refer
+        // to the property being initialised.
+        let names: Set<String> = [
+            "browse", "scan", "search", "top", "clean", "volumes", "access", "update", "info", "help",
+        ]
+        if let first = arguments.first {
+            // A flag like --help or --version, or an explicit command, is meant
+            // literally; a bare path is an invitation to browse it.
+            guard !first.hasPrefix("-"), !names.contains(first) else { return false }
+        }
+        return true
+    }
 }

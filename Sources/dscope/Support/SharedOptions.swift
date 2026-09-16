@@ -5,8 +5,10 @@ import Foundation
 /// Where the tree comes from: a fresh scan or a saved snapshot.
 struct SourceOptions: ParsableArguments {
 
+    static let wholeDisk = "/"
+
     @Argument(help: "Directory to scan, or a snapshot file to read. Defaults to the whole disk.")
-    var path: String = "/"
+    var path: String = SourceOptions.wholeDisk
 
     @Flag(name: .long, help: "Cross mount points, counting other volumes too.")
     var crossMounts = false
@@ -19,7 +21,12 @@ struct SourceOptions: ParsableArguments {
     /// Used only to give the progress bar a denominator.
     var previousSize: Int64?
 
-    func load(quiet: Bool = false) throws -> Snapshot {
+    /// Loads the tree, printing progress unless `quiet`.
+    ///
+    /// - Parameter summary: whether to report what was scanned when finished.
+    ///   An interactive browser draws over that line immediately, so it only
+    ///   adds a flash of text.
+    func load(quiet: Bool = false, summary: Bool = true) throws -> Snapshot {
         let url = URL(fileURLWithPath: path)
 
         var isDirectory: ObjCBool = false
@@ -49,7 +56,7 @@ struct SourceOptions: ParsableArguments {
         let duration = Date().timeIntervalSince(started)
 
         progress?.stop()
-        if !quiet {
+        if !quiet, summary {
             Output.note("scanned \(root.fileCount) files in \(String(format: "%.1fs", duration))")
         }
         return try narrow(
