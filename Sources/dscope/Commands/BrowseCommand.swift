@@ -26,13 +26,6 @@ struct BrowseCommand: ParsableCommand {
     )
     var naturalScroll = false
 
-    /// Where a bare `dscope` starts.
-    ///
-    /// The home directory rather than the whole disk: it holds what a person
-    /// can actually act on, and scanning it takes seconds where a full disk
-    /// takes minutes before anything appears.
-    static let defaultPath = FileManager.default.homeDirectoryForCurrentUser.path
-
     /// Keeps the parting summary to a handful of lines.
     private func summaryThreshold(for snapshot: Snapshot) -> Int64 {
         max(1_048_576, snapshot.totalSize / 50)
@@ -45,13 +38,15 @@ struct BrowseCommand: ParsableCommand {
     }
 
     func run() throws {
-        var source = source
-        // A bare invocation starts at home rather than the whole disk, which
-        // takes minutes before anything appears.
-        if source.snapshot == nil, source.path == SourceOptions.wholeDisk,
-           !CommandLine.arguments.contains(SourceOptions.wholeDisk) {
-            source.path = Self.defaultPath
+        // Said before the wait, not after: a scan of a whole disk takes minutes,
+        // and the time to learn it could have been saved is before spending it.
+        if source.snapshot == nil, Terminal.isInteractive {
+            Output.note(
+                "scanning \(source.path) — to keep the result, run"
+                    + " 'dscope scan \(source.path) --save <file>' and browse that with --snapshot"
+            )
         }
+
         let snapshot = try source.load(summary: false)
         let deleted = Browser(snapshot: snapshot, invertScroll: naturalScroll).run()
 

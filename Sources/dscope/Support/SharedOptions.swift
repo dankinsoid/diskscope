@@ -38,6 +38,12 @@ struct SourceOptions: ParsableArguments {
     @Flag(name: .long, help: "Cross mount points, counting other volumes too.")
     var crossMounts = false
 
+    @Flag(
+        name: .long,
+        help: "Scan every mounted volume, not only the one holding the given path."
+    )
+    var allVolumes = false
+
     @Option(name: .long, help: "Limit a snapshot to this subtree, e.g. --under ~/Library.")
     var under: String?
 
@@ -72,6 +78,10 @@ struct SourceOptions: ParsableArguments {
             )
         }
 
+        if allVolumes {
+            return try scanEveryVolume(quiet: quiet, summary: summary)
+        }
+
         let scanner = DiskScanner(options: ScanOptions(crossMountPoints: crossMounts))
         let progress = quiet
             ? nil
@@ -99,6 +109,44 @@ struct SourceOptions: ParsableArguments {
                 options: scanner.options,
                 duration: duration,
                 volume: VolumeInfo(path: path),
+                journalPosition: journalPosition
+            )
+        )
+    }
+
+    /// Scans every mounted volume and gathers them under one root.
+    private func scanEveryVolume(quiet: Bool, summary: Bool) throws -> Snapshot {
+        let options = ScanOptions(crossMountPoints: crossMounts)
+        let journalPosition = ChangeJournal.currentPosition()
+        let started = Date()
+
+        var scanners: [DiskScanner] = []
+        let root = AllVolumes.scan(options: options) { path in
+            let scanner = DiskScanner(options: options)
+            scanners.append(scanner)
+
+            let progress = quiet ? nil : ProgressReporter(
+                scanner: scanner,
+                estimate: ScanEstimate.of(path: path)
+            )
+            progress?.start()
+            defer { progress?.stop() }
+
+            return scanner.scan(path: path)
+        }
+
+        let duration = Date().timeIntervalSince(started)
+        if !quiet, summary {
+            Output.note("scanned \(root.fileCount) files across \(root.children.count) volumes in \(String(format: "%.1fs", duration))")
+        }
+
+        return try narrow(
+            Snapshot(
+                root: root,
+                rootPath: "",
+                options: options,
+                duration: duration,
+                volume: VolumeInfo(path: "/"),
                 journalPosition: journalPosition
             )
         )

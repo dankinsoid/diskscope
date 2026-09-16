@@ -14,20 +14,29 @@ is not what you want from a tool call.
 
 ## Scan once, then query the snapshot
 
-A scan is the expensive part: minutes for a whole disk, about ten seconds for a
-home directory. Save it, then answer every question from the saved file.
+**Scan with `--save` at the start of the conversation and use that snapshot for
+every question afterwards.** A scan is the expensive part — minutes for a whole
+disk, about ten seconds for a home directory — and repeating it per question
+wastes the user's time on an answer that has not changed.
 
 ```bash
-dscope scan ~ --save /tmp/home.dscope --json > /dev/null
+# once, at the start
+dscope scan / --save /tmp/dscope-session.dscope --json > /dev/null
 ```
 
+Keep that path for the rest of the session. Only scan again when the user has
+deleted something and wants updated figures, and prefer `update` even then.
+If the user asks about a directory you have already covered, use `--under`
+rather than scanning it separately.
+
 A positional path is always **scanned**. A saved scan is passed as
-`--snapshot` (`-S`), and every command accepts it:
+`--snapshot` (`-S`), and every command accepts it — this is how nearly every
+call in a session should look:
 
 ```bash
-dscope top --snapshot /tmp/home.dscope --count 20 --json
-dscope search --snapshot /tmp/home.dscope --name .build --glob --json
-dscope scan --snapshot /tmp/home.dscope --depth 2 --json
+dscope top --snapshot /tmp/dscope-session.dscope --count 20 --json
+dscope search --snapshot /tmp/dscope-session.dscope --name .build --glob --json
+dscope scan --snapshot /tmp/dscope-session.dscope --depth 2 --json
 ```
 
 Reading a snapshot costs about a second and happens on every command, so prefer
@@ -37,7 +46,7 @@ Refresh with `update` rather than scanning again — it asks the filesystem whic
 paths changed and re-measures only those:
 
 ```bash
-dscope update /tmp/home.dscope --json
+dscope update /tmp/dscope-session.dscope --json
 ```
 
 `rescannedDirectories` and `deltaBytes` say what moved. `fullScanReason` is set
@@ -51,7 +60,8 @@ narrows the result further, as find(1) predicates do.
 
 | Condition | Meaning |
 |---|---|
-| `--name <pattern>` (`-n`) | match by name; add `--glob`, `--regex` or `--path` |
+| `--name <pattern>` (`-n`) | substring of the name; add `--glob`, `--regex` or `--path` |
+| `--name 'build/'` | trailing slash means directories only |
 | `--size +1GB` / `--size 'over 1GB'` | at least that big |
 | `--size 'under 100MB'` | at most that big |
 | `--accessed '+6m'` / `--accessed 'over 6m'` | not read for six months |
@@ -67,7 +77,12 @@ Two things that will otherwise cost you a failed call:
   `--modified=-7d`. A bare `--modified -7d` fails with "Missing value".
 - **For directory names use `--glob`.** A substring match for `.build` also
   matches `*.build` inside DerivedData; on one machine that was 31.6 GB against
-  20.9 GB for the same intent.
+  20.9 GB for the same intent. Writing `--name 'build/'` is the shorthand for
+  "the directory called build".
+
+Matching is substring by default — not a regular expression, and not a glob.
+`--glob` anchors the pattern to the whole name (`*.log`, `node_modules`), and
+`--regex` takes a regular expression.
 
 Per-command options:
 
@@ -83,26 +98,26 @@ Per-command options:
 one directory without rescanning or printing the whole disk:
 
 ```bash
-dscope scan --snapshot /tmp/home.dscope --under ~/Library/Developer --depth 2 --json
+dscope scan --snapshot /tmp/dscope-session.dscope --under ~/Library/Developer --depth 2 --json
 ```
 
 ## Worked examples
 
 ```bash
 # Where the space is
-dscope scan --snapshot /tmp/home.dscope --depth 2 --min 1GB --json
+dscope scan --snapshot /tmp/dscope-session.dscope --depth 2 --min 1GB --json
 
 # Biggest things anywhere, none nested inside another
-dscope top --snapshot /tmp/home.dscope --count 20 --json
+dscope top --snapshot /tmp/dscope-session.dscope --count 20 --json
 
 # Large and long forgotten
-dscope search --snapshot /tmp/home.dscope --size +1GB --accessed 'over 6m' --json
+dscope search --snapshot /tmp/dscope-session.dscope --size +1GB --accessed 'over 6m' --json
 
 # Build output over half a gigabyte
-dscope search --snapshot /tmp/home.dscope --name .build --glob --size +500MB --json
+dscope search --snapshot /tmp/dscope-session.dscope --name .build --glob --size +500MB --json
 
 # Recently grown directories
-dscope top --snapshot /tmp/home.dscope --dirs-only --modified 'within 7d' --json
+dscope top --snapshot /tmp/dscope-session.dscope --dirs-only --modified 'within 7d' --json
 
 # What is holding space that no directory tree contains
 dscope volumes --json

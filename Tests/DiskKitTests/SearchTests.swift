@@ -209,3 +209,46 @@ extension SearchTests {
         #expect(snapshot.search(Filter(pattern: try Pattern("КОПИЯ"))).count == 2)
     }
 }
+
+extension SearchTests {
+
+    @Test("a trailing slash asks for directories")
+    func trailingSlashMeansDirectory() throws {
+        let root = Node(name: "/work", kind: .directory, size: 300, fileCount: 2)
+        let directory = Node(name: "build", kind: .directory, size: 200, fileCount: 1)
+        let file = Node(name: "build.log", kind: .file, size: 100, fileCount: 1)
+        for child in [directory, file] { child.parent = root }
+        root.children = [directory, file]
+        let snapshot = Snapshot(root: root, rootPath: "/work")
+
+        // Without this, "build/" matches nothing at all: a name never contains
+        // a slash, so the query can only be meant as "the directory".
+        #expect(snapshot.search(Filter(pattern: try Pattern("build/"))).map(\.name) == ["build"])
+        #expect(snapshot.search(Filter(pattern: try Pattern("build"))).count == 2)
+    }
+
+    @Test("a lone slash is still searched for literally")
+    func loneSlashIsLiteral() throws {
+        let pattern = try Pattern("/")
+        #expect(!pattern.matchesDirectoriesOnly)
+        #expect(pattern.text == "/")
+    }
+
+    @Test("a matching directory is reported without descending into it")
+    func stopsAtTheOutermostMatch() throws {
+        let root = Node(name: "/work", kind: .directory)
+        let outer = Node(name: "node_modules", kind: .directory, size: 1_000, fileCount: 2)
+        let inner = Node(name: "node_modules", kind: .directory, size: 400, fileCount: 1)
+        inner.parent = outer
+        outer.children = [inner]
+        outer.parent = root
+        root.children = [outer]
+        root.size = 1_000
+
+        let matches = Snapshot(root: root, rootPath: "/work")
+            .searchTopmost(Filter(pattern: try Pattern("node_modules")))
+
+        #expect(matches.count == 1)
+        #expect(matches[0] === outer)
+    }
+}

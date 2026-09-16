@@ -40,17 +40,21 @@ public extension Snapshot {
     func searchTopmost(_ filter: Filter, limit: Int? = nil, sortedBy order: NodeOrder = .size) -> [Node] {
         guard !filter.isEmpty else { return [] }
 
+        // One test per node: walking with a separate descend predicate asked
+        // the same question twice, which doubles the cost over millions of
+        // entries for no gain.
         var matches: [Node] = []
-        root.walk(
-            descend: { node in
-                // Once a directory matches, its contents are part of that match.
-                node === root || !filter.matches(node)
-            },
-            visit: { node in
-                guard node !== root else { return }
-                if filter.matches(node) { matches.append(node) }
+        var stack = [root]
+
+        while let node = stack.popLast() {
+            if node !== root, filter.matches(node) {
+                // A directory that matches contains its own match; going deeper
+                // would report the same bytes again.
+                matches.append(node)
+                continue
             }
-        )
+            stack.append(contentsOf: node.children)
+        }
         matches.sort(by: order.compare)
         if let limit, matches.count > limit {
             matches.removeSubrange(limit...)

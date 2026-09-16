@@ -16,6 +16,9 @@ public struct Pattern: Sendable {
     public let mode: MatchMode
     public let matchesFullPath: Bool
 
+    /// Set when the query was written with a trailing slash.
+    public let matchesDirectoriesOnly: Bool
+
     /// Lowercased UTF-8 of the query, for the fast path.
     ///
     /// `range(of:options:)` with case and diacritic folding costs a full Unicode
@@ -34,6 +37,15 @@ public struct Pattern: Sendable {
     private let regex: NSRegularExpression?
 
     public init(_ text: String, mode: MatchMode = .substring, matchesFullPath: Bool = false) throws {
+        // A trailing slash is how a directory is written; searching for it
+        // literally finds nothing, since a node's name never contains one.
+        var text = text
+        var directoriesOnly = false
+        if mode == .substring, text.count > 1, text.hasSuffix("/") {
+            text.removeLast()
+            directoriesOnly = true
+        }
+        self.matchesDirectoriesOnly = directoriesOnly
         self.text = text
         self.mode = mode
         self.matchesFullPath = matchesFullPath
@@ -53,6 +65,7 @@ public struct Pattern: Sendable {
     }
 
     public func matches(_ node: Node) -> Bool {
+        if matchesDirectoriesOnly, !node.isDirectory { return false }
         let subject = matchesFullPath ? node.path : node.name
         switch mode {
         case .substring:
