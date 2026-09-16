@@ -113,3 +113,39 @@ extension Data {
         append(contentsOf: data)
     }
 }
+
+extension Data {
+
+    /// Volume figures are optional: a snapshot of a path whose volume could not
+    /// be read still has a tree worth keeping.
+    mutating func append(volume: VolumeInfo?) {
+        guard let volume else {
+            append(byte: 0)
+            return
+        }
+        append(byte: 1)
+        append(string: volume.mountPoint)
+        append(string: volume.device)
+        append(string: volume.filesystem)
+        append(byte: volume.isReadOnly ? 1 : 0)
+        append(uint64: UInt64(bitPattern: volume.capacity))
+        append(uint64: UInt64(bitPattern: volume.used))
+        append(uint64: UInt64(bitPattern: volume.available))
+    }
+}
+
+extension ByteReader {
+
+    mutating func volume() throws -> VolumeInfo? {
+        guard try byte() == 1 else { return nil }
+        return VolumeInfo(
+            mountPoint: try string(),
+            device: try string(),
+            filesystem: try string(),
+            isReadOnly: try byte() == 1,
+            capacity: Int64(bitPattern: try uint64()),
+            used: Int64(bitPattern: try uint64()),
+            available: Int64(bitPattern: try uint64())
+        )
+    }
+}

@@ -47,6 +47,41 @@ public struct NodeJSON: Codable, Sendable {
 }
 
 public struct ScanReportJSON: Codable, Sendable {
+
+    /// What the volume reports, set against what the scan could measure.
+    ///
+    /// Present so a consumer can tell "this is all the space in use" from "this
+    /// is what a directory walk could reach", which differ by a lot on macOS.
+    public struct AccountingJSON: Codable, Sendable {
+        public let volumeMountPoint: String
+        public let volumeUsedBytes: Int64
+        public let volumeCapacityBytes: Int64
+        public let volumeAvailableBytes: Int64
+        public let measuredBytes: Int64
+        public let unaccountedBytes: Int64
+        public let humanUnaccounted: String
+        public let unreadableDirectories: Int
+        public let coversWholeVolume: Bool
+        public let measuredShareOfVolume: Double
+        public let explanation: String?
+
+        init(_ accounting: SpaceAccounting) {
+            self.volumeMountPoint = accounting.volume.mountPoint
+            self.volumeUsedBytes = accounting.volume.used
+            self.volumeCapacityBytes = accounting.volume.capacity
+            self.volumeAvailableBytes = accounting.volume.available
+            self.measuredBytes = accounting.measured
+            self.unaccountedBytes = accounting.unaccounted
+            self.humanUnaccounted = accounting.unaccounted.formattedBytes()
+            self.unreadableDirectories = accounting.unreadableCount
+            self.coversWholeVolume = accounting.coversWholeVolume
+            self.measuredShareOfVolume = accounting.measuredShare
+            self.explanation = accounting.coversWholeVolume
+                ? "Space in use that no directory tree contains: other volumes sharing the container, APFS snapshots, or directories that could not be read. See 'dscope volumes'."
+                : "This scan covers one directory; the rest is the other contents of the volume."
+        }
+    }
+
     public let root: String
     public let scannedAt: Date
     public let durationSeconds: Double
@@ -54,6 +89,7 @@ public struct ScanReportJSON: Codable, Sendable {
     public let humanSize: String
     public let totalFiles: Int
     public let unreadablePaths: [String]
+    public let accounting: AccountingJSON?
     public let tree: NodeJSON?
 
     public init(snapshot: Snapshot, tree: NodeJSON?) {
@@ -64,6 +100,7 @@ public struct ScanReportJSON: Codable, Sendable {
         self.humanSize = snapshot.totalSize.formattedBytes()
         self.totalFiles = snapshot.fileCount
         self.unreadablePaths = snapshot.unreadablePaths
+        self.accounting = snapshot.accounting.map(AccountingJSON.init)
         self.tree = tree
     }
 }

@@ -35,8 +35,8 @@ struct ScanCommand: ParsableCommand {
             try Output.emit(ScanReportJSON(snapshot: snapshot, tree: tree), pretty: format.pretty)
         } else {
             print(TreeRenderer.render(snapshot.root, depth: depth, minimumSize: minimumSize))
-            if !snapshot.unreadablePaths.isEmpty {
-                Output.note("\(snapshot.unreadablePaths.count) directories could not be read; sizes are lower bounds")
+            for line in Accounting.lines(for: snapshot) {
+                Output.note(line)
             }
         }
     }

@@ -10,11 +10,12 @@ takes `--json`; use it, and read the fields rather than parsing the text output.
 
 ## Always scan to a snapshot first
 
-A scan of a home directory takes ~10s and a full disk several minutes. A
-snapshot loads in under a second, so scan once and query it repeatedly:
+`dscope` scans the whole disk by default, which takes a few minutes; a home
+directory takes about ten seconds. A snapshot loads in under a second, so scan
+once and query it repeatedly:
 
 ```bash
-dscope scan ~ --save /tmp/home.dscope --json > /dev/null
+dscope scan / --save /tmp/disk.dscope --json > /dev/null
 ```
 
 Pass the snapshot path wherever a directory would go:
@@ -30,6 +31,7 @@ Re-scan only when the user has deleted things and wants updated numbers.
 | Task | Command |
 |---|---|
 | Overview of a tree | `dscope scan <path> --depth 2 --min 1GB --json` |
+| Volumes and snapshots | `dscope volumes --json` |
 | Largest entries anywhere | `dscope top <path> --count 20 --json` |
 | Large and untouched | `dscope top <path> --stale-days 180 --json` |
 | Find by name | `dscope search <query> <path> --mode glob --json` |
@@ -72,17 +74,31 @@ several. Deletion moves items to the Trash, so it is recoverable — do not pass
 - `unreadablePaths` lists directories that could not be read. Those sizes are
   lower bounds — mention this rather than presenting the total as exact.
 
-## What the numbers do not include
+## When the total looks too small
 
-APFS local snapshots hold tens of gigabytes and appear in no directory tree.
-When a scan's total is far below the space actually used, check them:
+A directory tree cannot contain everything that occupies a disk. Every scan
+reports an `accounting` object saying so:
 
-```bash
-tmutil listlocalsnapshots /
-```
+- `measuredBytes` against `volumeUsedBytes` — what the walk reached, against
+  what the volume reports in use;
+- `unaccountedBytes` — the difference;
+- `coversWholeVolume` — false when only a directory was scanned, in which case
+  the difference is simply the rest of the disk.
 
-Scanning `/` needs Full Disk Access for the terminal, and takes several minutes.
-Prefer scanning `~` unless the user asks about the whole disk.
+When `coversWholeVolume` is true and `unaccountedBytes` is large, the space is
+held by things no tree contains. Run `dscope volumes --json` to see them:
+
+- **other volumes in the same APFS container** — Preboot, VM swap, Recovery and
+  the System volume can hold tens of gigabytes between them. They share one
+  storage pool, so the volumes in a pool all report the same `usedBytes`; never
+  sum them. Nothing here is deletable through this tool.
+- **APFS local snapshots**, listed as `localSnapshots`. Remove with
+  `tmutil deletelocalsnapshots <name>` — tell the user the command rather than
+  running it.
+- **unreadable directories**, when Full Disk Access is not granted to the
+  terminal.
+
+Scanning `/` needs Full Disk Access to be complete, and takes a few minutes.
 
 ## Judging what is safe
 

@@ -5,8 +5,8 @@ import Foundation
 /// Where the tree comes from: a fresh scan or a saved snapshot.
 struct SourceOptions: ParsableArguments {
 
-    @Argument(help: "Directory to scan, or a snapshot file to read.")
-    var path: String = FileManager.default.homeDirectoryForCurrentUser.path
+    @Argument(help: "Directory to scan, or a snapshot file to read. Defaults to the whole disk.")
+    var path: String = "/"
 
     @Flag(name: .long, help: "Cross mount points, counting other volumes too.")
     var crossMounts = false
@@ -35,7 +35,13 @@ struct SourceOptions: ParsableArguments {
         if !quiet {
             Output.note("scanned \(root.fileCount) files in \(String(format: "%.1fs", duration))")
         }
-        return Snapshot(root: root, rootPath: path, options: scanner.options, duration: duration)
+        return Snapshot(
+            root: root,
+            rootPath: path,
+            options: scanner.options,
+            duration: duration,
+            volume: VolumeInfo(path: path)
+        )
     }
 }
 

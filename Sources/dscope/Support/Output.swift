@@ -37,10 +37,12 @@ enum TreeRenderer {
         into lines: inout [String]
     ) {
         guard depth > 0 else { return }
+
         let visible = parent.children.filter { $0.size >= minimumSize }
+        let hidden = parent.children.filter { $0.size < minimumSize }
 
         for (index, child) in visible.enumerated() {
-            let isLast = index == visible.count - 1
+            let isLast = index == visible.count - 1 && hidden.isEmpty
             let branch = isLast ? "└── " : "├── "
             let marker = selection?.covers(child) == true ? "[x] " : ""
             let suffix = child.error != nil ? "  (unreadable)" : ""
@@ -58,6 +60,14 @@ enum TreeRenderer {
                     into: &lines
                 )
             }
+        }
+
+        // Without this the visible children do not add up to their parent, and
+        // everything below the threshold disappears without trace.
+        if !hidden.isEmpty {
+            let bytes = hidden.reduce(Int64(0)) { $0 + $1.size }
+            let label = hidden.count == 1 ? "1 smaller entry" : "\(hidden.count) smaller entries"
+            lines.append("\(bytes.formattedBytes())\t\(prefix)└── (\(label))")
         }
     }
 }

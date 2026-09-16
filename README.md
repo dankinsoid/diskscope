@@ -25,15 +25,32 @@ this?"*, and that is what the tool is shaped around.
 
 ## Usage
 
-Scan a directory and show the top two levels, hiding anything under 1 GB:
+Scan the whole disk — the default — showing the top level and hiding anything
+under 1 GB:
 
 ```console
-$ dscope scan ~ --depth 2 --min 1GB
-64.0 GB	/Users/you
-25.9 GB	├── Code/
-12.7 GB	│   ├── project-a/
- 6.8 GB	│   └── project-b/
- 8.1 GB	└── Library/
+$ dscope scan --depth 1 --min 1GB
+387 GB	/
+256 GB	├── Users/
+37.1 GB	├── System/
+31.4 GB	├── private/
+25.5 GB	├── Library/
+ 7.2 GB	└── (24 smaller entries)
+measured 387 GB of 467 GB in use — 80.4 GB is not in any directory tree
+run 'dscope volumes' to see the volumes and APFS snapshots holding it
+```
+
+Entries below the threshold are grouped rather than dropped, so what is shown
+still adds up to its parent. Scanning one directory instead reports its share
+of the disk:
+
+```console
+$ dscope scan ~/Code --depth 1 --min 10GB
+59.6 GB	/Users/you/Code
+24.1 GB	├── project-a/
+11.8 GB	├── project-b/
+23.7 GB	└── (93 smaller entries)
+this is 14% of the 434 GB in use on /System/Volumes/Data; 374 GB is elsewhere
 ```
 
 Save a snapshot, then explore it without rescanning:
@@ -75,6 +92,29 @@ $ dscope search node_modules ~/home.dscope --json --limit 1
 
 Nested matches are skipped by default: searching for `node_modules` reports the
 outermost copy, never the same bytes twice.
+
+### Space no directory tree contains
+
+A tree walk cannot find everything that fills a disk. `dscope volumes` shows
+what else is holding space — other volumes in the same APFS container, and
+local snapshots:
+
+```console
+$ dscope volumes
+disk3  435 GB used of 460 GB, 25.5 GB free
+    /  ro
+    /System/Volumes/Data
+    /System/Volumes/Preboot
+    /System/Volumes/VM
+
+3 local APFS snapshots — these hold space that no directory tree shows:
+  com.apple.os.update-2C083E7D042E96779F886D9092C61E88A0E7AB9EE4C8ACE14FD9C26E43B17C55
+Remove with: tmutil deletelocalsnapshots <name>
+```
+
+Volumes in one container share a storage pool, so they all report the same used
+figure — do not add them up. On one machine the Preboot and VM volumes held
+53 GB between them, none of it visible from `/`.
 
 ## How sizes are counted
 

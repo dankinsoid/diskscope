@@ -9,7 +9,7 @@ import Foundation
 public enum SnapshotFile {
 
     static let magic: UInt32 = 0x64_73_63_70  // "dscp"
-    static let version: UInt16 = 1
+    static let version: UInt16 = 2
 
     public static func write(_ snapshot: Snapshot, to url: URL) throws {
         var strings = StringTable()
@@ -29,6 +29,7 @@ public enum SnapshotFile {
         output.append(byte: snapshot.options.crossMountPoints ? 1 : 0)
         output.append(byte: snapshot.options.deduplicateHardLinks ? 1 : 0)
         output.append(string: snapshot.rootPath)
+        output.append(volume: snapshot.volume)
         output.append(data: strings.encoded())
         output.append(uint64: UInt64(snapshot.root.subtreeCount))
         output.append(nodes)
@@ -42,7 +43,7 @@ public enum SnapshotFile {
 
         guard try reader.uint32() == magic else { throw SnapshotError.notASnapshot }
         let fileVersion = try reader.uint16()
-        guard fileVersion == version else { throw SnapshotError.unsupportedVersion(fileVersion) }
+        guard fileVersion <= version else { throw SnapshotError.unsupportedVersion(fileVersion) }
         _ = try reader.uint16()
 
         let scannedAt = Date(timeIntervalSince1970: try reader.double())
@@ -52,6 +53,8 @@ public enum SnapshotFile {
             deduplicateHardLinks: try reader.byte() == 1
         )
         let rootPath = try reader.string()
+        // Volume figures arrived in version 2; older files simply lack them.
+        let volume = fileVersion >= 2 ? try reader.volume() : nil
         let strings = try StringTable(reader: &reader)
         let count = Int(try reader.uint64())
 
@@ -63,7 +66,8 @@ public enum SnapshotFile {
             rootPath: rootPath,
             scannedAt: scannedAt,
             options: options,
-            duration: duration
+            duration: duration,
+            volume: volume
         )
     }
 

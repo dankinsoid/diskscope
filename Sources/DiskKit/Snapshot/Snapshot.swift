@@ -9,18 +9,36 @@ public struct Snapshot: Sendable {
     public let options: ScanOptions
     public let duration: TimeInterval
 
+    /// What the filesystem reported for the scanned volume at scan time.
+    public let volume: VolumeInfo?
+
     public init(
         root: Node,
         rootPath: String,
         scannedAt: Date = Date(),
         options: ScanOptions = ScanOptions(),
-        duration: TimeInterval = 0
+        duration: TimeInterval = 0,
+        volume: VolumeInfo? = nil
     ) {
         self.root = root
         self.rootPath = rootPath
         self.scannedAt = scannedAt
         self.options = options
         self.duration = duration
+        self.volume = volume
+    }
+
+    /// Measured size set against what the volume reports in use.
+    public var accounting: SpaceAccounting? {
+        volume.map { volume in
+            let standardized = (rootPath as NSString).standardizingPath
+            return SpaceAccounting(
+                volume: volume,
+                measured: totalSize,
+                unreadableCount: unreadablePaths.count,
+                coversWholeVolume: standardized == volume.mountPoint || standardized == "/"
+            )
+        }
     }
 
     public var totalSize: Int64 { root.size }
