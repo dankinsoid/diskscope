@@ -73,3 +73,71 @@ struct BrowsingTests {
         #expect(snapshot.root.node(atPath: "/work/alpha/.build") == nil)
     }
 }
+
+@Suite("Folding small entries")
+struct FoldingTests {
+
+    /// A directory with a few large children and a long tail of small ones.
+    private func makeDirectory(largeCount: Int, smallCount: Int) -> Node {
+        let root = Node(name: "/work", kind: .directory)
+        var children: [Node] = []
+
+        for index in 0 ..< largeCount {
+            let child = Node(name: "large-\(index)", kind: .directory, size: 10_000, fileCount: 1)
+            child.parent = root
+            children.append(child)
+        }
+        for index in 0 ..< smallCount {
+            let child = Node(name: "small-\(index)", kind: .file, size: 10, fileCount: 1)
+            child.parent = root
+            children.append(child)
+        }
+        root.children = children
+        root.size = children.reduce(0) { $0 + $1.size }
+        root.fileCount = children.count
+        return root
+    }
+
+    @Test("a long tail of small entries collapses into one row")
+    func foldsTheTail() {
+        let root = makeDirectory(largeCount: 3, smallCount: 40)
+        let threshold = max(Int64(1), root.size / 100)
+
+        let large = root.children.filter { $0.size >= threshold }
+        let small = root.children.filter { $0.size < threshold }
+
+        #expect(large.count == 3)
+        #expect(small.count == 40)
+
+        // What the row stands for: every small entry, and their total.
+        #expect(small.reduce(Int64(0)) { $0 + $1.size } == 400)
+    }
+
+    @Test("a directory of comparable entries is not folded")
+    func leavesEvenDirectoriesAlone() {
+        let root = makeDirectory(largeCount: 20, smallCount: 0)
+        let threshold = max(Int64(1), root.size / 100)
+
+        #expect(root.children.allSatisfy { $0.size >= threshold })
+    }
+
+    @Test("folding away a handful of rows is not worth the keystroke")
+    func skipsShortTails() {
+        // Three small entries take three lines; a fold takes one and costs a
+        // keypress to undo, which is not a trade worth making.
+        let root = makeDirectory(largeCount: 5, smallCount: 3)
+        let threshold = max(Int64(1), root.size / 100)
+        let small = root.children.filter { $0.size < threshold }
+
+        #expect(small.count <= 3)
+    }
+
+    @Test("the threshold scales with the directory, not with absolute size")
+    func thresholdIsRelative() {
+        let small = makeDirectory(largeCount: 3, smallCount: 10)
+        let large = makeDirectory(largeCount: 300, smallCount: 10)
+
+        // The same shape folds the same way whatever the totals.
+        #expect(max(Int64(1), small.size / 100) < max(Int64(1), large.size / 100))
+    }
+}

@@ -55,11 +55,14 @@ struct DScope: ParsableCommand {
         let names: Set<String> = [
             "browse", "scan", "search", "top", "clean", "volumes", "access", "update", "info", "doctor", "help",
         ]
-        if let first = arguments.first {
-            // A flag like --help or --version, or an explicit command, is meant
-            // literally; a bare path is an invitation to browse it.
-            guard !first.hasPrefix("-"), !names.contains(first) else { return false }
-        }
-        return true
+        guard let first = arguments.first else { return true }
+
+        // An explicit command is meant literally.
+        guard !names.contains(first) else { return false }
+
+        // Help and version print and exit; everything else — a path, or options
+        // such as --snapshot — is an invitation to look around.
+        let printsAndExits: Set<String> = ["-h", "--help", "--version"]
+        return !printsAndExits.contains(first)
     }
 }

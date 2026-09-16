@@ -21,6 +21,26 @@ struct BrowserState {
 
     var status: String?
 
+    /// Entries below the threshold are folded into one row per directory.
+    ///
+    /// A directory of a thousand entries is unreadable, and most of them are
+    /// bytes. Rather than hiding them, the small ones collect into a row that
+    /// opens like a folder — so nothing disappears and the list stays legible.
+    var foldSmallEntries = true
+
+    /// Directories whose folded row the user has opened.
+    private var unfolded: Set<ObjectIdentifier> = []
+
+    /// The row standing in for everything folded away in `current`.
+    private(set) var foldedRow: FoldedRow?
+
+    struct FoldedRow {
+        let nodes: [Node]
+        let bytes: Int64
+        /// Index in `rows` where the fold sits.
+        let index: Int
+    }
+
     struct SearchState {
         var query: String
         var mode: MatchMode
@@ -31,13 +51,30 @@ struct BrowserState {
     init(snapshot: Snapshot) {
         self.snapshot = snapshot
         self.current = snapshot.root
-        self.rows = snapshot.root.children
+        self.rows = []
         self.cursor = 0
         self.scroll = 0
+        reload()
     }
 
     var selectedNode: Node? {
-        rows.indices.contains(cursor) ? rows[cursor] : nil
+        guard let index = rowIndex(forCursor: cursor) else { return nil }
+        return rows.indices.contains(index) ? rows[index] : nil
+    }
+
+    /// Maps a cursor position to an index in `rows`.
+    ///
+    /// The folded row occupies a line of its own without being a node, so
+    /// everything after it sits one line further down than its index.
+    func rowIndex(forCursor cursor: Int) -> Int? {
+        guard let foldedRow else { return cursor }
+        if cursor == foldedRow.index { return nil }
+        return cursor > foldedRow.index ? cursor - 1 : cursor
+    }
+
+    /// Lines on screen, counting the folded row.
+    var displayCount: Int {
+        rows.count + (foldedRow == nil ? 0 : 1)
     }
 
     var isSearching: Bool { search != nil }
@@ -57,6 +94,14 @@ struct BrowserState {
         open(node)
     }
 
+    /// Selects every entry hidden behind the fold, so it can be acted on
+    /// without expanding it first.
+    mutating func selectFolded() {
+        guard let foldedRow else { return }
+        for node in foldedRow.nodes { selection.insert(node) }
+        status = "selected \(foldedRow.nodes.count) smaller entries"
+    }
+
     mutating func goUp() {
         if isSearching {
             search = nil
@@ -70,6 +115,7 @@ struct BrowserState {
     }
 
     mutating func open(_ node: Node) {
+        unfolded.remove(ObjectIdentifier(current))
         current = node
         cursor = 0
         scroll = 0
@@ -77,13 +123,13 @@ struct BrowserState {
     }
 
     mutating func move(by delta: Int) {
-        guard !rows.isEmpty else { return }
-        cursor = Swift.max(0, Swift.min(rows.count - 1, cursor + delta))
+        guard displayCount > 0 else { return }
+        cursor = Swift.max(0, Swift.min(displayCount - 1, cursor + delta))
     }
 
     mutating func moveTo(_ index: Int) {
-        guard !rows.isEmpty else { return }
-        cursor = Swift.max(0, Swift.min(rows.count - 1, index))
+        guard displayCount > 0 else { return }
+        cursor = Swift.max(0, Swift.min(displayCount - 1, index))
     }
 
     // MARK: - Sorting and selection
@@ -172,9 +218,58 @@ struct BrowserState {
     mutating func reload() {
         if isSearching {
             runSearch()
+            foldedRow = nil
         } else {
-            rows = current.children.sorted(by: order.compare)
+            buildRows()
         }
-        cursor = Swift.min(cursor, Swift.max(0, rows.count - 1))
+        cursor = Swift.min(cursor, Swift.max(0, displayCount - 1))
+    }
+
+    private mutating func buildRows() {
+        let sorted = current.children.sorted(by: order.compare)
+        foldedRow = nil
+
+        guard foldSmallEntries, !unfolded.contains(ObjectIdentifier(current)) else {
+            rows = sorted
+            return
+        }
+
+        let threshold = Self.threshold(for: current)
+        let large = sorted.filter { $0.size >= threshold }
+        let small = sorted.filter { $0.size < threshold }
+
+        // Folding one or two rows away only costs a keystroke to undo.
+        guard small.count > 3 else {
+            rows = sorted
+            return
+        }
+
+        rows = large
+        foldedRow = FoldedRow(
+            nodes: small,
+            bytes: small.reduce(0) { $0 + $1.size },
+            index: large.count
+        )
+    }
+
+    /// The size below which entries are folded together.
+    ///
+    /// A share of the directory rather than a fixed size, so it means the same
+    /// thing in a home directory and in a source tree.
+    private static func threshold(for directory: Node) -> Int64 {
+        Swift.max(1, directory.size / 100)
+    }
+
+    /// Whether the cursor is on the folded row.
+    var isOnFoldedRow: Bool {
+        guard let foldedRow else { return false }
+        return cursor == foldedRow.index
+    }
+
+    mutating func openFold() {
+        unfolded.insert(ObjectIdentifier(current))
+        let previousCount = rows.count
+        reload()
+        cursor = Swift.min(previousCount, Swift.max(0, rows.count - 1))
     }
 }

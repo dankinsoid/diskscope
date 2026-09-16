@@ -105,11 +105,17 @@ point of the exercise is reclaiming space.
 
 ## Machine-readable output
 
-Every command has a `--json` form alongside its human output, and the TUI is
-never required to reach any capability. This is what makes the CLI usable by
-agents; an MCP server or a skill is then a thin wrapper over a stable interface
-rather than a parallel implementation. Skills are the broader target, since not
-every agent runtime supports MCP.
+Every command has a `--json` form alongside its human output, and the browser is
+never required to reach any capability. That is what makes the tool usable by an
+agent: a skill describes the commands, and there is nothing an agent can do that
+a person at a terminal cannot.
+
+An MCP server was built and then removed. It wrapped the same capabilities a
+second time, and its session cache made the model worse rather than better —
+a tool call would scan a directory implicitly, leaving an agent waiting minutes
+without knowing why, and then answer from that cache indefinitely as the disk
+moved on. One surface, explicit about when it scans, is easier to reason about
+than two.
 
 ## Knowledge layer — later
 

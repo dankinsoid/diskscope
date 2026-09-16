@@ -8,7 +8,6 @@ let package = Package(
     products: [
         .library(name: "DiskKit", targets: ["DiskKit"]),
         .executable(name: "dscope", targets: ["dscope"]),
-        .executable(name: "dscope-mcp", targets: ["dscope-mcp"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
@@ -22,7 +21,6 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
-        .executableTarget(name: "dscope-mcp", dependencies: ["DiskKit"]),
         .testTarget(name: "DiskKitTests", dependencies: ["DiskKit"]),
     ]
 )

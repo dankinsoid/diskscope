@@ -49,7 +49,8 @@ enum BrowserView {
 
         // Position in the list, so a long directory does not leave you guessing
         // where you are or how much is below.
-        let position = state.rows.isEmpty ? "" : "  \(state.cursor + 1)/\(state.rows.count)"
+        let total = state.displayCount
+        let position = total == 0 ? "" : "  \(state.cursor + 1)/\(total)"
         return Style.bold(path) + Style.dim("  \(size)\(position)")
     }
 
@@ -68,8 +69,14 @@ enum BrowserView {
         let scroll = visibleWindow(state: state, height: height)
         var lines: [String] = []
 
-        for index in scroll ..< min(state.rows.count, scroll + height) {
-            lines.append(row(state.rows[index], state: state, isCursor: index == state.cursor, width: width))
+        for index in scroll ..< min(state.displayCount, scroll + height) {
+            if let fold = state.foldedRow, index == fold.index {
+                lines.append(foldRow(fold, isCursor: index == state.cursor, width: width))
+                continue
+            }
+            guard let rowIndex = state.rowIndex(forCursor: index), rowIndex < state.rows.count
+            else { continue }
+            lines.append(row(state.rows[rowIndex], state: state, isCursor: index == state.cursor, width: width))
         }
         while lines.count < height { lines.append("") }
         return lines
@@ -103,6 +110,22 @@ enum BrowserView {
             return Style.dim(line)
         }
         return node.isDirectory ? line : Style.dim(line)
+    }
+
+    /// The folded row, drawn as the directory it behaves like.
+    private static func foldRow(
+        _ fold: BrowserState.FoldedRow,
+        isCursor: Bool,
+        width: Int
+    ) -> String {
+        let pointer = isCursor ? "▸" : " "
+        let size = fold.bytes.formattedBytes().leftPadded(to: 9)
+        let label = "\(fold.nodes.count) smaller entries/"
+        let line = "\(pointer)  \(size) \(bar(0)) \(label)"
+
+        return isCursor
+            ? Style.inverted(line.rightPadded(to: width))
+            : Style.dim(line)
     }
 
     /// A short bar giving the share of the parent at a glance.
@@ -143,6 +166,7 @@ enum BrowserView {
     /// Scroll offset keeping the cursor on screen with a little context.
     private static func visibleWindow(state: BrowserState, height: Int) -> Int {
         let margin = 2
+        let total = state.displayCount
         var scroll = state.scroll
 
         if state.cursor < scroll + margin {
@@ -151,7 +175,7 @@ enum BrowserView {
         if state.cursor >= scroll + height - margin {
             scroll = state.cursor - height + margin + 1
         }
-        return max(0, min(scroll, max(0, state.rows.count - height)))
+        return max(0, min(scroll, max(0, total - height)))
     }
 
     static func scrollOffset(for state: BrowserState, height: Int) -> Int {

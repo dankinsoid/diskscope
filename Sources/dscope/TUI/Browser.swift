@@ -97,12 +97,18 @@ final class Browser {
             state.moveTo(Int.max)
 
         case .right, .enter, .character("l"):
-            state.enter()
+            // The folded row opens in place rather than descending, since what
+            // it stands for belongs to this directory.
+            state.isOnFoldedRow ? state.openFold() : state.enter()
         case .left, .backspace, .character("h"):
             state.goUp()
 
         case .space:
-            state.toggleSelection()
+            if state.isOnFoldedRow {
+                state.selectFolded()
+            } else {
+                state.toggleSelection()
+            }
             state.move(by: 1)
         case .character("a"):
             state.selectAllRows()

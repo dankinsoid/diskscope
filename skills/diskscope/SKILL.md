@@ -22,10 +22,8 @@ once and query it repeatedly:
 dscope scan / --save /tmp/disk.dscope --json > /dev/null
 ```
 
-Reading a snapshot costs about a second, and the CLI re-reads it on every
-command. When several questions are coming, prefer the MCP server if it is
-available: it keeps snapshots in memory between calls, which halves the time for
-three queries and saves more as they multiply.
+Reading a snapshot costs about a second, and it is re-read on every command, so
+prefer a few broad queries to many narrow ones.
 
 A positional path is always scanned; a saved scan is named with `--snapshot`:
 
