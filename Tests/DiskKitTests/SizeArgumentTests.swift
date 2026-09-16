@@ -16,7 +16,8 @@ struct SizeArgumentTests {
         ("1tb", Int64(1_099_511_627_776)),
     ])
     func parsesSizes(_ text: String, _ expected: Int64) throws {
-        #expect(try SizeArgument.parse(text) == expected)
+        let parsed = try SizeArgument.parse(text)
+        #expect(parsed == expected)
     }
 
     @Test("rejects input that is not a size", arguments: ["", "abc", "GB", "10 parsecs"])

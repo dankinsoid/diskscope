@@ -89,11 +89,30 @@ struct DiskScannerTests {
 
     @Test("records permission failures without aborting the scan")
     func survivesUnreadableDirectories() throws {
-        let tree = DiskScanner().scan(path: "/private/var/db")
-        #expect(tree.size > 0)
+        let root = try makeTree { root in
+            let readable = root.appendingPathComponent("readable")
+            try FileManager.default.createDirectory(at: readable, withIntermediateDirectories: false)
+            try Data(repeating: 1, count: 20_000).write(to: readable.appendingPathComponent("data.bin"))
 
-        let unreadable = tree.children.filter { $0.error == .permissionDenied }
-        #expect(!unreadable.isEmpty, "expected at least one directory to be unreadable without root")
+            let locked = root.appendingPathComponent("locked")
+            try FileManager.default.createDirectory(
+                at: locked, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o000]
+            )
+        }
+        defer {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: root.appendingPathComponent("locked").path
+            )
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let tree = DiskScanner().scan(path: root.path)
+
+        // The readable half is still measured.
+        #expect(tree.size >= 20_000)
+
+        let locked = try #require(tree.children.first { $0.name == "locked" })
+        #expect(locked.error == .permissionDenied)
     }
 }
 
