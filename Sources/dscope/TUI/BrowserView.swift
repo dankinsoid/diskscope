@@ -23,25 +23,28 @@ enum BrowserView {
 
     private static func header(_ state: BrowserState, width: Int) -> String {
         if let search = state.search {
-            // Drawn as a filled bar: the rest of the screen is dim text, and a
-            // dim line of the same shape does not read as somewhere to type.
-            let label = search.mode == .regex ? " regex " : " search "
-            let typed = truncate(search.query, to: max(8, width - 44))
-            let caret = search.isEditing ? "▏" : ""
+            // The whole field is highlighted, not just its label: the typed
+            // text is what needs to stand out, and as plain text it looks no
+            // different from the list underneath.
+            let label = search.mode == .regex ? "regex" : "search"
+            let typed = truncate(search.query, to: max(8, width - 46))
+            let caret = search.isEditing ? "█" : " "
 
             let hint: String
             if let error = search.error {
                 hint = error
             } else if search.query.isEmpty {
-                hint = "type to search · esc cancels"
+                hint = "esc cancels"
             } else {
                 hint = "\(state.rows.count) matches · enter keeps them · esc cancels"
             }
 
-            let entry = Style.inverted(label) + " " + typed + caret
-            let plainWidth = label.count + 1 + typed.count + caret.count
-            let padding = max(1, width - plainWidth - hint.count - 1)
-            return entry + String(repeating: " ", count: padding) + Style.dim(hint)
+            // A fixed-width field, so it reads as a box to type into whether or
+            // not anything has been typed yet.
+            let fieldWidth = max(20, width - hint.count - label.count - 6)
+            let contents = " \(typed)\(caret)".rightPadded(to: fieldWidth)
+
+            return Style.bold("\(label) ") + Style.inverted(contents) + Style.dim("  \(hint)")
         }
 
         let path = truncate(state.current.path, to: width - 32)

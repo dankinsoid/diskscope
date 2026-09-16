@@ -206,6 +206,10 @@ struct BrowserState {
     }
 
     private mutating func runSearch() {
+        // Results come from the whole tree, where a fold — which stands for the
+        // rest of one directory — has no meaning.
+        foldedRow = nil
+
         guard var state = search else { return }
         guard !state.query.isEmpty else {
             rows = []
