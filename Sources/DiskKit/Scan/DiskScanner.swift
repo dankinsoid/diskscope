@@ -147,7 +147,11 @@ public final class DiskScanner: @unchecked Sendable {
                     continue
                 }
                 children.append(child)
-                subdirectories.append(child)
+                // Cloud-only content occupies no local blocks, and reading it
+                // would download it.
+                if !entry.isDataless {
+                    subdirectories.append(child)
+                }
 
             case .file, .symlink:
                 // A hard-linked file occupies its blocks once, no matter how many

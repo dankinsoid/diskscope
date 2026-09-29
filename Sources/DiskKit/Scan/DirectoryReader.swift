@@ -7,8 +7,13 @@ struct RawEntry {
     var allocatedSize: Int64
     var fileID: UInt64
     var linkCount: UInt32
+    var flags: UInt32
     var modified: Date?
     var accessed: Date?
+
+    /// Content lives only in the cloud; opening the directory makes the file
+    /// provider download it before the call returns.
+    var isDataless: Bool { flags & UInt32(SF_DATALESS) != 0 }
 }
 
 /// Reads directory entries with their metadata in batches via `getattrlistbulk`.
@@ -30,6 +35,7 @@ enum DirectoryReader {
             | attrgroup_t(ATTR_CMN_OBJTYPE)
             | attrgroup_t(ATTR_CMN_MODTIME)
             | attrgroup_t(ATTR_CMN_ACCTIME)
+            | attrgroup_t(ATTR_CMN_FLAGS)
             | attrgroup_t(ATTR_CMN_FILEID)
         attrList.fileattr =
             attrgroup_t(ATTR_FILE_ALLOCSIZE)
@@ -62,18 +68,13 @@ enum DirectoryReader {
     /// Decodes one variable-length entry.
     ///
     /// Fields appear in ascending bitmap-bit order, not in the order they are
-    /// listed in `attrlist`, and 64-bit fields are padded to an 8-byte boundary
-    /// relative to the start of the entry. Verified against `lstat` in tests.
+    /// listed in `attrlist`, packed without padding: a 64-bit field may sit on a
+    /// 4-byte boundary. Verified against `lstat` in tests.
     private static func parse(_ start: UnsafeRawPointer) -> RawEntry? {
         var cursor = start + MemoryLayout<UInt32>.size
 
         let returned = cursor.loadUnaligned(as: attribute_set_t.self)
         cursor += MemoryLayout<attribute_set_t>.size
-
-        func align(to alignment: Int) {
-            let offset = start.distance(to: cursor)
-            cursor = start + (offset + alignment - 1) & ~(alignment - 1)
-        }
 
         guard returned.commonattr & attrgroup_t(ATTR_CMN_NAME) != 0,
               returned.commonattr & attrgroup_t(ATTR_CMN_OBJTYPE) != 0
@@ -98,6 +99,12 @@ enum DirectoryReader {
             cursor += MemoryLayout<timespec>.size
         }
 
+        var flags: UInt32 = 0
+        if returned.commonattr & attrgroup_t(ATTR_CMN_FLAGS) != 0 {
+            flags = cursor.loadUnaligned(as: UInt32.self)
+            cursor += MemoryLayout<UInt32>.size
+        }
+
         var fileID: UInt64 = 0
         if returned.commonattr & attrgroup_t(ATTR_CMN_FILEID) != 0 {
             fileID = cursor.loadUnaligned(as: UInt64.self)
@@ -112,7 +119,6 @@ enum DirectoryReader {
 
         var allocatedSize: Int64 = 0
         if returned.fileattr & attrgroup_t(ATTR_FILE_ALLOCSIZE) != 0 {
-            align(to: MemoryLayout<off_t>.size)
             allocatedSize = cursor.loadUnaligned(as: off_t.self)
         }
 
@@ -129,6 +135,7 @@ enum DirectoryReader {
             allocatedSize: allocatedSize,
             fileID: fileID,
             linkCount: linkCount,
+            flags: flags,
             modified: modified,
             accessed: accessed
         )

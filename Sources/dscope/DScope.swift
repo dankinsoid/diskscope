@@ -6,6 +6,9 @@ import Foundation
 enum Main {
 
     static func main() {
+        // A dataless directory the scanner misses fails with EDEADLK rather than
+        // downloading from iCloud while the walk waits on it.
+        setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
         var arguments = Array(CommandLine.arguments.dropFirst())
         if DScope.shouldBrowse(arguments) {
             arguments.insert("browse", at: 0)

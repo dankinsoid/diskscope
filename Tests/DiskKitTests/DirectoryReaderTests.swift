@@ -19,6 +19,9 @@ struct DirectoryReaderTests {
             withDestinationPath: root.appendingPathComponent("a.bin").path
         )
 
+        // A set flag shifts every field after it, so decoding is checked with one.
+        #expect(chflags(root.appendingPathComponent("sub").path, UInt32(UF_HIDDEN)) == 0)
+
         let entries = try DirectoryReader.read(path: root.path)
         let byName = Dictionary(uniqueKeysWithValues: entries.map { ($0.name, $0) })
 
@@ -37,6 +40,7 @@ struct DirectoryReaderTests {
             #expect(lstat(root.appendingPathComponent(entry.name).path, &status) == 0)
             #expect(entry.allocatedSize == Int64(status.st_blocks) * 512, "allocatedSize of \(entry.name)")
             #expect(entry.fileID == UInt64(status.st_ino), "fileID of \(entry.name)")
+            #expect(entry.flags == status.st_flags, "flags of \(entry.name)")
             if entry.kind != .directory {
                 #expect(entry.linkCount == status.st_nlink, "linkCount of \(entry.name)")
             }
